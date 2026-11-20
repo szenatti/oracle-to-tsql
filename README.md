@@ -21,13 +21,16 @@ A GitHub Copilot-powered toolkit for migrating Oracle SQL/PL/SQL code to Microso
 ## Project Structure
 
 ```
-samples/                 ← Sample Oracle SQL files for testing (5 files, 🟢→🔴)
+samples/                 ← Sample Oracle SQL files for testing (6 files, 🟢→🔴)
 oracle-sql/              ← Drop Oracle SQL files here (source, read-only)
 tsql-output/             ← Converted T-SQL output (auto-generated)
 pbi-output/              ← Power BI M-language output (.pq files)
 migration-reports/       ← Evaluation, validation & performance reports
 .github/
-  ├── copilot-instructions.md          ← Global conversion reference
+  ├── copilot-instructions.md          ← Always-on project rules and critical semantic rules
+  ├── skills/
+  │   ├── oracle-tsql-reference/       ← On-demand mapping tables, patterns and sources
+  │   └── oracle-data-profiling/       ← Oracle profiling and post-load reconciliation queries
   ├── instructions/
   │   ├── oracle-sql.instructions.md   ← Context for Oracle files
   │   ├── tsql-output.instructions.md  ← Standards for T-SQL output

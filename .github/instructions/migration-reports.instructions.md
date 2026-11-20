@@ -90,7 +90,7 @@ Every report ends with a prioritized action items table:
 | # | Priority | Finding | Action | Status |
 |---|----------|---------|--------|--------|
 | 1 | 🔴 Must Fix | F-001 | Replace CASE x WHEN NULL with CASE WHEN x IS NULL | ⬜ Open |
-| 2 | 🟡 Should Fix | F-003 | Add NULLIF wrapper for empty string columns | ⬜ Open |
+| 2 | 🟡 Should Fix | F-003 | Add DATALENGTH-based empty-to-NULL wrapper for empty string columns | ⬜ Open |
 | 3 | 🟢 Consider | F-005 | Replace cursor with set-based UPDATE | ⬜ Open |
 ```
 
@@ -110,7 +110,7 @@ Each Oracle SQL file produces a **single** consolidated migration report built i
 
 Structure:
 1. **Report Header** — source file, date (created by evaluator)
-2. **Part 1: Evaluation** — complexity, object inventory, Oracle-specific features, semantic differences, dependencies, risks, recommendations (created by `@oracle-evaluator`)
+2. **Part 1: Evaluation** — complexity, source Oracle version, target collation, object inventory, Oracle-specific features, semantic differences, dependencies, risks, recommendations, and data profiling queries for mappings pending profiling (created by `@oracle-evaluator`)
 3. **Part 2: Validation** — structural checks, semantic equivalence, completeness, findings, test scenarios (replaced by `@tsql-validator` at `<!-- PHASE:VALIDATION -->`)
 4. **Part 3: Performance Analysis** — query patterns, findings, index recommendations, optimized code, configuration, testing (replaced by `@performance-analyzer` at `<!-- PHASE:PERFORMANCE -->`)
 5. **Part 4: Power BI M-Language** — object inventory, conversion decisions, folding analysis, connection requirements, skipped objects, findings (replaced by `@m-language-converter` at `<!-- PHASE:M-LANGUAGE -->`)

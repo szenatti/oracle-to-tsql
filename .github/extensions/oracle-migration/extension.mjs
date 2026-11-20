@@ -258,7 +258,7 @@ const session = await joinSession({
                             ``,
                             `## Instructions`,
                             `1. Read the rules file: \`.github/agents/${PHASE_AGENTS[phase]}\` — follow ALL rules described there.`,
-                            `2. Read the reference tables: \`.github/copilot-instructions.md\``,
+                            `2. Read the reference skill: \`.github/skills/oracle-tsql-reference/SKILL.md\` — always read \`references/semantic-differences.md\`, then the reference files it lists for the constructs in the source`,
                             `3. Read the source Oracle SQL: \`${src}\``,
                             ...(priorArtifacts.length
                                 ? [`4. Read prior artifacts (if they exist):`, ...priorArtifacts]

@@ -53,7 +53,7 @@ For each Oracle SQL file that hasn't been processed yet, run the 5-phase pipelin
 #### Phase 1: Evaluate
 Read the file `.github/agents/oracle-evaluator.md` for rules, then:
 - Read the Oracle SQL source file
-- Read `.github/copilot-instructions.md` for reference tables
+- Read `.github/skills/oracle-tsql-reference/SKILL.md` and its `semantic-differences.md`
 - Analyze for complexity, Oracle-specific features, dependencies, risks
 - **Create** the consolidated report `migration-reports/migration-<filename>.md` with skeleton + Part 1 (Evaluation)
 
@@ -61,7 +61,7 @@ Read the file `.github/agents/oracle-evaluator.md` for rules, then:
 Read the file `.github/agents/oracle-to-tsql.md` for rules, then:
 - Read the Oracle SQL source file
 - Read the migration report for context (Part 1: Evaluation)
-- Read `.github/copilot-instructions.md` for conversion tables
+- Read `.github/skills/oracle-tsql-reference/SKILL.md` and the reference files it lists for the constructs in the source
 - Convert Oracle SQL → T-SQL following all rules
 - Save converted file to `tsql-output/<filename>`
 
@@ -134,7 +134,7 @@ When the `task` tool is available, you can dispatch sub-agents for parallel proc
 
 Each sub-agent prompt should instruct the agent to:
 - Read the relevant `.github/agents/<phase-agent>.md` for rules
-- Read `.github/copilot-instructions.md` for reference tables
+- Read `.github/skills/oracle-tsql-reference/SKILL.md` and the reference files it lists for the constructs in the source
 - Process the single assigned file
 - Save output to the correct path
 
@@ -166,3 +166,13 @@ Each sub-agent prompt should instruct the agent to:
 - If a file fails during any phase, report the error and continue with the next file
 - After processing all files, summarize: how many succeeded, how many failed, what needs attention
 - Failed files can be retried individually: `@migration-orchestrator convert oracle-sql/failed_file.sql`
+
+## Data Profiling and Reconciliation
+
+- After the evaluate phase, collect every report's **1.7 Data Profiling** section into one list of Oracle queries for the DBA, and tell the user that the affected mappings use safe defaults until results come back ([oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md)).
+- After the data is loaded into SQL Server, offer the paired checks in [reconciliation-queries.md](../skills/oracle-data-profiling/references/reconciliation-queries.md) (row counts, column profiles, row hashes).
+
+## References
+
+- [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) (rules, with sources in [sources.md](../skills/oracle-tsql-reference/references/sources.md)) · [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md)
+- [SSMA for Oracle](https://learn.microsoft.com/en-us/sql/ssma/oracle/sql-server-migration-assistant-for-oracle-oracletosql) — Microsoft's tool for bulk schema conversion and data migration in this direction · [Oracle to SQL Server migration guide](https://learn.microsoft.com/en-us/sql/sql-server/migrate/guides/oracle-to-sql-server)

@@ -12,6 +12,7 @@ You are an expert SQL Server performance engineer. Your role is to analyze conve
 - Read the converted T-SQL from `tsql-output/<filename>`
 - Read the original Oracle SQL from `oracle-sql/<filename>` for context
 - Read the evaluation and validation reports if available
+- Look up conversion rules in the [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) skill before suggesting a rewrite — a faster query that changes Oracle semantics is a regression
 
 ### 2. Query Pattern Analysis
 
@@ -58,6 +59,7 @@ Oracle is more permissive with implicit conversions. Converted code may rely on 
 - NVARCHAR vs VARCHAR mismatches in JOINs (causes conversion and prevents index seeks)
 - Date-to-string comparisons
 - Parameter type mismatches with column types (parameter sniffing + conversion)
+- `FORMAT()` in set-based queries (converted from `TO_CHAR`) — it is CLR-based and slow; prefer `CONVERT(VARCHAR(n), d, style)` when a style matches ([functions.md](../skills/oracle-tsql-reference/references/functions.md#oracle-date-formats--convert-styles) · [FORMAT](https://learn.microsoft.com/en-us/sql/t-sql/functions/format-transact-sql))
 
 #### Index Utilization (🟡 MEDIUM IMPACT)
 **Check:**
@@ -66,6 +68,7 @@ Oracle is more permissive with implicit conversions. Converted code may rely on 
 - `LIKE '%prefix'` (leading wildcard prevents index seek)
 - OR conditions on different columns (consider UNION ALL)
 - Computed columns or filtered indexes needed?
+- Hot `DATALENGTH(col) > 0` filters (from Oracle `IS NOT NULL` on strings) can't seek — consider a persisted computed column such as `code_present AS CAST(CASE WHEN DATALENGTH(code) > 0 THEN 1 ELSE 0 END AS BIT) PERSISTED` with an index. **Don't** replace them with `col <> N''`, which changes results ([semantic-differences §1](../skills/oracle-tsql-reference/references/semantic-differences.md#1-empty-string--null) · [Indexes on computed columns](https://learn.microsoft.com/en-us/sql/relational-databases/indexes/indexes-on-computed-columns))
 
 #### Join Patterns
 **Check:**
@@ -97,8 +100,8 @@ Oracle is more permissive with implicit conversions. Converted code may rely on 
 #### String Aggregation
 **Check:**
 - `STRING_AGG` performance on large datasets
-- Ordering within aggregation (SQL Server 2022+ supports WITHIN GROUP)
-- Pre-2022: need subquery workaround for ordering
+- Ordering within aggregation: `WITHIN GROUP (ORDER BY …)` works wherever `STRING_AGG` does (SQL Server 2017+); no subquery workaround is needed
+- Inputs that aren't `NVARCHAR(MAX)` fail once the result passes 8000 bytes (error 9829) — cast the input to `NVARCHAR(MAX)` ([STRING_AGG](https://learn.microsoft.com/en-us/sql/t-sql/functions/string-agg-transact-sql))
 
 #### Parameter Sniffing
 **Check for procedures:**
@@ -113,6 +116,7 @@ Oracle is more permissive with implicit conversions. Converted code may rely on 
 - Consider `READ COMMITTED SNAPSHOT ISOLATION` (RCSI) at database level for Oracle-like behavior
 - Excessive locking scope — row vs page vs table
 - NOLOCK hints should NOT be recommended as a default fix
+- Converted `SELECT … FOR UPDATE` should use `WITH (UPDLOCK, ROWLOCK)` inside a short explicit transaction; queue-style `SKIP LOCKED` → `READPAST`. Long transactions around these locks serialize work ([conversion-patterns.md](../skills/oracle-tsql-reference/references/conversion-patterns.md#locking-select--for-update) · [Table hints](https://learn.microsoft.com/en-us/sql/t-sql/queries/hints-transact-sql-table))
 
 #### Pagination
 **Check:**
@@ -302,3 +306,8 @@ When analyzing all converted files:
 ## Action Items
 <Aggregated, deduplicated, prioritized>
 ```
+
+## References
+
+- Conversion rules and sources: [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) · [sources.md](../skills/oracle-tsql-reference/references/sources.md)
+- [Transaction locking and row versioning guide](https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-transaction-locking-and-row-versioning-guide) · [Table hints](https://learn.microsoft.com/en-us/sql/t-sql/queries/hints-transact-sql-table) · [Scalar UDF inlining](https://learn.microsoft.com/en-us/sql/relational-databases/user-defined-functions/scalar-udf-inlining) · [Parameter Sensitive Plan optimization](https://learn.microsoft.com/en-us/sql/relational-databases/performance/parameter-sensitive-plan-optimization) · [Memory-optimized temp tables](https://learn.microsoft.com/en-us/sql/relational-databases/in-memory-oltp/faster-temp-table-and-table-variable-by-using-memory-optimization)

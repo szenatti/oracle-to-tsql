@@ -64,6 +64,14 @@ SELECT * FROM employees WHERE first_name IS NOT NULL; -- Excludes '' in Oracle
 -- Concatenation with empty/null string
 SELECT first_name || '' || last_name FROM employees; -- '' treated as NULL, but || ignores NULL
 
+-- Spaces-only values are NOT NULL in Oracle (only '' is)
+-- SQL Server ignores trailing spaces in = / <> / NULLIF, so NULLIF(x, N'') wrongly nulls these
+INSERT INTO employees (employee_id, first_name, last_name, hire_date, email)
+VALUES (998, ' ', 'SpaceUser', SYSDATE, 'space@example.com');  -- Stores ' ' in Oracle
+SELECT * FROM employees WHERE first_name IS NOT NULL;           -- Includes employee 998 in Oracle
+SELECT department_id, LISTAGG(first_name, ',') WITHIN GROUP (ORDER BY employee_id) AS names
+FROM employees GROUP BY department_id;                          -- Keeps ' ', skips '' in Oracle
+
 -- ============================================================
 -- 4. DECODE with NULL comparisons
 -- ============================================================

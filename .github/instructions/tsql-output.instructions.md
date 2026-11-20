@@ -22,6 +22,8 @@ Every converted file must start with a header block:
  * Source: oracle-sql/<original_filename>.sql
  * Converted: <date>
  * Description: <brief description of what this object does>
+ * Source Oracle version: <from the evaluation, e.g. 19c>
+ * Target collation: <e.g. SQL_Latin1_General_CP1_CI_AS (default) or a case-sensitive collation>
  * Migration Notes: <any critical notes about behavioral differences>
  */
 ```
@@ -40,6 +42,7 @@ CREATE OR ALTER PROCEDURE [dbo].[procedure_name]
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;   -- only in procedures that own their transaction; see the transactions pattern
     BEGIN TRY
         -- Converted logic here
     END TRY
@@ -49,6 +52,8 @@ BEGIN
 END;
 GO
 ```
+
+Use the transaction templates in [conversion-patterns.md](../skills/oracle-tsql-reference/references/conversion-patterns.md#transactions-and-error-handling). Leave `XACT_ABORT` off where the Oracle caller handles this procedure's exceptions and carries on.
 
 ### Tables
 
@@ -83,3 +88,9 @@ Use inline comments for migration annotations:
 - Must use `BEGIN TRY/CATCH` for error handling
 - Must preserve original business logic semantics
 - Must not use deprecated T-SQL features (`SET ROWCOUNT`, `*=` joins, etc.)
+- Must emulate Oracle's empty-string rule with `DATALENGTH`, never `NULLIF(x, N'')` or `LEN(x) = 0`
+- Must use a filtered unique index (or indexed view) for `UNIQUE` keys on nullable columns
+- Must keep Oracle's conversion failures: `CONVERT` / `CAST`, with `TRY_` functions only where Oracle used `DEFAULT … ON CONVERSION ERROR`
+- Must convert row-level triggers to set-based triggers over `inserted` / `deleted`
+
+Rules, examples and sources: [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md).

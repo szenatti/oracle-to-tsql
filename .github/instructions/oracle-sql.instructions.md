@@ -21,8 +21,12 @@ When working with files in the `oracle-sql/` directory, these are **source Oracl
    - Oracle data types (VARCHAR2, NUMBER, CLOB, BLOB, etc.)
    - Oracle-specific syntax (CREATE OR REPLACE, DUAL, := assignment, %TYPE/%ROWTYPE)
    - Oracle built-in packages (DBMS_OUTPUT, DBMS_LOB, UTL_FILE, etc.)
+   - Newer-release features (identity columns, `FETCH FIRST`, `DEFAULT … ON CONVERSION ERROR`, SQL `BOOLEAN`), which show the minimum source version
 3. **Note dependencies**: References to other objects, synonyms, database links, sequences
-4. **Flag potential issues**: Autonomous transactions, CONNECT BY hierarchies, custom types, bulk operations, REF CURSORs
+4. **Flag potential issues**: Autonomous transactions, CONNECT BY hierarchies, custom types, bulk operations, REF CURSORs, row-level triggers, `MERGE … DELETE WHERE`, `SELECT … FOR UPDATE`, global temporary tables
+5. **Flag data-dependent mappings**: bare `NUMBER`, `NUMBER(1)`–`NUMBER(4)`, `DATE`, `TIMESTAMP(8|9)`, and string or nullable `UNIQUE` keys need the Oracle profiling queries from the [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md) skill
+
+Conversion rules and their sources are in the [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) skill.
 
 ## Naming Convention for Output
 

@@ -20,6 +20,7 @@ How to use this Oracle-to-TSQL migration toolkit with **GitHub Copilot CLI** and
 |---------|---------------------|-------------|
 | Custom agents (`@oracle-evaluator`, etc.) | ✅ | ✅ |
 | Global instructions (copilot-instructions.md) | ✅ | ✅ |
+| Agent skills (`.github/skills/`) | ✅ | ✅ |
 | Path-specific instructions (auto-context) | ✅ | ✅ |
 | Single-file migration | ✅ | ✅ |
 | Batch migration (`@migration-orchestrator`) | ✅ Sequential | ✅ Parallel (sub-agents) |
@@ -311,7 +312,8 @@ Then review the generated summary at `migration-reports/migration-summary.md`.
 ```mermaid
 graph TB
     subgraph "GitHub Copilot Configuration"
-        CI["copilot-instructions.md\n(Global Oracle↔T-SQL reference)"]
+        CI["copilot-instructions.md\n(Always-on rules)"]
+        SK["skills/oracle-tsql-reference\n+ oracle-data-profiling\n(loaded on demand)"]
         I1["instructions/oracle-sql\n(auto-attached for oracle-sql/)"]
         I2["instructions/tsql-output\n(auto-attached for tsql-output/)"]
         I3["instructions/migration-reports\n(auto-attached for reports/)"]
@@ -337,6 +339,7 @@ graph TB
     end
 
     CI --> A1 & A2 & A3 & A4
+    SK -.->|"read when needed"| A1 & A2 & A3 & A4
     A5 --> T1 & T2 & T3 & T4
     T4 --> S
     T3 --> A1 & A2 & A3 & A4
@@ -350,7 +353,9 @@ graph TB
 
 | File | What it does | When it activates |
 |------|-------------|-------------------|
-| `.github/copilot-instructions.md` | Provides comprehensive Oracle↔T-SQL mapping tables (data types, functions, syntax, constructs) | Every Copilot interaction in this project |
+| `.github/copilot-instructions.md` | Project overview, the 18 critical semantic rules with sources, and coding standards | Every Copilot interaction in this project |
+| `.github/skills/oracle-tsql-reference/` | Oracle↔T-SQL mapping tables (data types, functions, syntax, PL/SQL), conversion patterns and the sources behind each rule | Loaded on demand by agents (or when Copilot judges it relevant) |
+| `.github/skills/oracle-data-profiling/` | Oracle profiling queries for data-dependent mappings and paired post-load reconciliation queries | When a mapping depends on the data, or after data is loaded |
 | `.github/instructions/oracle-sql.instructions.md` | Tells Copilot these are read-only Oracle sources; guides analysis approach | When working with `oracle-sql/**` files |
 | `.github/instructions/tsql-output.instructions.md` | Enforces T-SQL output standards (headers, SET options, error handling, GO separators) | When working with `tsql-output/**` files |
 | `.github/instructions/migration-reports.instructions.md` | Defines report format with severity tags | When working with `migration-reports/**` files |

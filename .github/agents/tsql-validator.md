@@ -11,7 +11,8 @@ You are an expert T-SQL and Oracle SQL engineer specializing in migration valida
 ### 1. Load Both Files
 - Read the original Oracle SQL from `oracle-sql/<filename>`
 - Read the converted T-SQL from `tsql-output/<filename>`
-- Read the consolidated migration report from `migration-reports/migration-<filename>.md` if available (Part 1 contains the evaluation)
+- Read the consolidated migration report from `migration-reports/migration-<filename>.md` if available (Part 1 contains the evaluation, source Oracle version, target collation and any pending profiling)
+- Read [semantic-differences.md](../skills/oracle-tsql-reference/references/semantic-differences.md) and the [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) files for the constructs in the source — validate against them, not from memory
 
 ### 2. Structural Validation
 
@@ -23,6 +24,7 @@ Verify the converted file has proper T-SQL structure:
 - [ ] Schema-qualified object names (`[dbo].[name]`)
 - [ ] `SET NOCOUNT ON` in stored procedures
 - [ ] `BEGIN TRY/CATCH` error handling in procedures
+- [ ] `SET XACT_ABORT ON` in procedures that own their transaction (not in procedures whose Oracle callers handle their exceptions and continue)
 - [ ] No deprecated T-SQL features used
 - [ ] Migration notes included where conversions are non-trivial
 
@@ -58,6 +60,38 @@ Check every instance where:
 - `NVL`/`COALESCE` is used on string columns
 - String comparisons involve potentially empty values
 - WHERE clauses filter on string columns
+- `LISTAGG` → `STRING_AGG` conversions on columns that may contain `''`
+
+#### Spaces-Only Values (🔴 CRITICAL)
+```
+Oracle:  ' ' IS NULL = FALSE  (only '' becomes NULL; spaces are kept)
+T-SQL:   N'   ' = N''  → TRUE   (trailing spaces are padded before comparison)
+         NULLIF(N' ', N'') → NULL  ❌ Oracle returns ' '
+```
+Flag as ❌ any empty-string emulation using:
+- `NULLIF(x, N'')` / `NULLIF(x, '')`
+- `x = N''` or `x <> N''` / `x != ''`
+- `LEN(x) = 0` or `LEN(x) > 0`
+
+Correct pattern: `CASE WHEN DATALENGTH(x) = 0 THEN NULL ELSE x END`, `DATALENGTH(x) > 0`, `x IS NULL OR DATALENGTH(x) = 0`.
+For `CHAR(n)`/`NCHAR(n)` columns, `''` is stored padded to `n` spaces — verify it is converted to NULL during data load.
+
+#### String Comparison: Trailing Spaces and Collation (🔴 CRITICAL)
+- Oracle compares `VARCHAR2` without padding and, by default, case-sensitively. SQL Server pads and its default collation is case-insensitive. See [§2–3](../skills/oracle-tsql-reference/references/semantic-differences.md#2-trailing-spaces-in-string-comparisons).
+- For every string `UNIQUE` key, primary key, join and `GROUP BY`: check that the report records a collation decision, and that profiling checks P1–P2 cleared the column or a case-sensitive `COLLATE` is applied.
+
+#### UNIQUE Constraints and NULL (🔴 CRITICAL)
+- A plain `UNIQUE` on a nullable column is ❌: SQL Server allows one NULL, Oracle many.
+- Expect a filtered unique index (`WHERE col IS NOT NULL`), or an indexed view for nullable composite keys. Exception handlers for `DUP_VAL_ON_INDEX` must accept error 2601 as well as 2627. See [§4](../skills/oracle-tsql-reference/references/semantic-differences.md#4-unique-constraints-and-null).
+
+#### Type Precision (🔴 CRITICAL)
+- Bare `NUMBER` → `DECIMAL(18,0)` is ❌ (rounds fractions). Expect a profiled `DECIMAL(p,s)`, or `DECIMAL(38,10)` with a warning.
+- `NUMBER(1)`–`NUMBER(4)` → `TINYINT` is ❌ unless profiling shows no negatives.
+- `TIMESTAMP(8|9)` → `DATETIME2(7)` needs a note about rounding.
+- See [data-types.md](../skills/oracle-tsql-reference/references/data-types.md).
+
+#### Conversion Errors (🔴 CRITICAL)
+- `TO_DATE` / `TO_NUMBER` / `CAST` converted to `TRY_CONVERT` / `TRY_CAST` is ❌ unless the Oracle code used `DEFAULT … ON CONVERSION ERROR`, `VALIDATE_CONVERSION` or a handler that substituted a value. Otherwise bad input silently becomes NULL. See [§7](../skills/oracle-tsql-reference/references/semantic-differences.md#7-conversion-errors-vs-try_-functions).
 
 #### DECODE → CASE Conversion (🔴 CRITICAL)
 ```
@@ -76,29 +110,55 @@ Verify ALL DECODE conversions, especially those comparing to NULL.
 - Oracle `DATE` includes time — verify `DATETIME2` is used, not `DATE`, when time matters
 - `TRUNC(sysdate)` → `CAST(GETDATE() AS DATE)` — verify time truncation is preserved
 - Date arithmetic: Oracle allows `date + 1` (adds days); T-SQL needs `DATEADD(DAY, 1, date)`
-- Date format strings: Verify Oracle format models are correctly mapped to .NET format strings
+- Fractional days (`d + 1/24`) through `DATEADD(DAY, …)` are ❌ — `DATEADD` truncates the fraction
+- `d2 - d1` through `DATEDIFF(DAY, …)` is ❌ when fractions or elapsed time matter — `DATEDIFF` counts midnight boundaries
+- `ADD_MONTHS` through plain `DATEADD(MONTH, …)` is ❌ for month-end dates
+- `TO_CHAR(d, 'D')` / `DATEPART(WEEKDAY, …)` must not depend on `@@DATEFIRST`
+- Date format strings: Verify Oracle format models are correctly mapped to `CONVERT` styles or .NET format strings
+- See [§9 and §16](../skills/oracle-tsql-reference/references/semantic-differences.md#9-date-arithmetic-and-fractional-days) and [functions.md](../skills/oracle-tsql-reference/references/functions.md#date-and-time-functions)
 
 #### String Operations (🟡 WARNING)
 - `||` concatenation with NULLs: Oracle `'a' || NULL` = `'a'`; T-SQL `'a' + NULL` = `NULL`
   - Must use `CONCAT()` or `ISNULL`/`COALESCE` to preserve behavior
 - `SUBSTR` with negative position: Oracle counts from end; `SUBSTRING` does not
+- `SUBSTR(s, 0, n)`: Oracle treats position 0 as 1; `SUBSTRING(s, 0, n)` returns one character fewer
+- `LPAD` with a string longer than `n`: Oracle keeps the leftmost characters
+- `TRIM` of a spaces-only value: Oracle returns NULL, T-SQL returns `''`
+- `TRANSLATE` with a shorter `to` string: Oracle removes characters, T-SQL raises error 9828
 - `LENGTH(NULL)` returns NULL in both, but `LENGTH('')` returns NULL in Oracle, `LEN('')` returns 0 in T-SQL
+- `LEN` ignores trailing spaces: `LEN(N'   ') = 0` in T-SQL, `LENGTH('   ') = 3` in Oracle
 
 #### Numeric Operations
-- `MOD` → `%` — verify negative number handling (Oracle MOD follows sign of dividend)
+- `MOD` → `%` — the sign follows the dividend in both; `MOD(a, 0)` returns `a` in Oracle but `%` raises error 8134
+- `GREATEST` / `LEAST` — Oracle returns NULL for a NULL argument; SQL Server ignores it, so a NULL guard is required
 - `TRUNC(number)` → `ROUND(number, 0, 1)` — verify truncate mode
 - Division: Oracle integer/integer = decimal result; T-SQL integer/integer = integer (truncated)
   - Fix: `CAST(a AS DECIMAL) / b` or `a * 1.0 / b`
+- Division by zero raises an error in both for `NUMBER` / `DECIMAL` / `FLOAT`; flag `BINARY_DOUBLE` code that relied on infinity
 
 #### Transaction Semantics
 - Oracle: implicit transactions (every DML is in a transaction until COMMIT/ROLLBACK)
 - T-SQL: autocommit by default unless explicit `BEGIN TRANSACTION`
 - Verify explicit transaction management is preserved or added where needed
+- Procedures that own their transaction: `SET XACT_ABORT ON`, `@@TRANCOUNT` check, `XACT_STATE()` in `CATCH`
+- Call paths where Oracle callers handle a subprogram's exception and continue must keep `XACT_ABORT` OFF; otherwise SQL Server dooms the whole transaction
+- `COMMIT` / `ROLLBACK` inside called procedures need a `-- MIGRATION WARNING:` (an inner `COMMIT` only decrements `@@TRANCOUNT`)
+- `SELECT … FOR UPDATE` must become lock hints inside an explicit transaction — a standalone locking `SELECT` releases its locks immediately in autocommit mode
+- No `NOLOCK` hints
+- See [§17–18](../skills/oracle-tsql-reference/references/semantic-differences.md#17-transactions-and-error-handling) and [conversion-patterns.md](../skills/oracle-tsql-reference/references/conversion-patterns.md#transactions-and-error-handling)
+
+#### Identity, MERGE, Triggers, Links and Temporary Tables (🟡 WARNING)
+- Identity: `GENERATED ALWAYS` → `IDENTITY`; `GENERATED BY DEFAULT` → sequence default; `DEFAULT ON NULL` needs a warning; sequence-assigning triggers removed
+- `MERGE`: ends with `;`; Oracle `DELETE WHERE` became a `WHEN MATCHED AND … THEN DELETE` branch, written against the updated values and placed before the `UPDATE` branch
+- Triggers: set-based over `inserted` / `deleted` and correct for multi-row statements; no per-row assumptions such as scalar variables assigned from `inserted`
+- Database links → linked servers or three-part names; `PUBLIC` synonyms handled; distributed transactions noted
+- Global temporary tables → `#temp` or a session-keyed table, with `ON COMMIT DELETE ROWS` behaviour reproduced
+- See [conversion-patterns.md](../skills/oracle-tsql-reference/references/conversion-patterns.md)
 
 #### Exception / Error Handling
 - `NO_DATA_FOUND` → must use `@@ROWCOUNT = 0` check AFTER the SELECT
 - `TOO_MANY_ROWS` → must use `@@ROWCOUNT > 1` or `SELECT TOP 2` pattern
-- `DUP_VAL_ON_INDEX` → `ERROR_NUMBER() = 2627` (unique constraint) or `2601` (unique index)
+- `DUP_VAL_ON_INDEX` → `ERROR_NUMBER() = 2627` (unique constraint) or `2601` (unique index, including filtered unique indexes and indexed views)
 - Custom exceptions (`RAISE_APPLICATION_ERROR -20xxx`) → `THROW 50001+`
 - Verify all error paths from original are covered
 
@@ -163,8 +223,9 @@ Replace the placeholder with this structure:
 | 6 | BEGIN TRY/CATCH error handling | ✅/❌ | |
 | 7 | No deprecated T-SQL features | ✅/❌ | |
 | 8 | Migration notes for non-trivial conversions | ✅/❌ | |
+| 9 | `SET XACT_ABORT ON` in transaction-owning procedures | ✅/❌/N/A | |
 
-**Result**: X/8 checks passed
+**Result**: X/9 checks passed
 
 ### 2.2 Semantic Equivalence
 
@@ -178,8 +239,13 @@ Replace the placeholder with this structure:
 | 6 | Error/exception handling paths | ✅/⚠️/❌ | | ... |
 | 7 | Transaction semantics | ✅/⚠️/❌ | | ... |
 | 8 | Cursor behavior | ✅/⚠️/❌ | | ... |
+| 9 | String comparison (trailing spaces, collation) | ✅/⚠️/❌ | | ... |
+| 10 | UNIQUE constraints and NULL | ✅/⚠️/❌ | | ... |
+| 11 | Type precision (`NUMBER`, `NUMBER(1)`, `TIMESTAMP`) | ✅/⚠️/❌ | | ... |
+| 12 | Conversion error behaviour (`TRY_` usage) | ✅/⚠️/❌ | | ... |
+| 13 | Identity, MERGE, triggers, locking, links, temp tables | ✅/⚠️/❌ | | ... |
 
-**Result**: X/8 areas verified
+**Result**: X/13 areas verified
 
 ### 2.3 Completeness Check
 
@@ -234,6 +300,13 @@ Use the standard finding format for each issue:
 |---|----------|-----------------|--------------------------|--------------------------|----------|----------|
 | 1 | NULL input to procedure | `@param = NULL` | Raises ORA-20001 | Throws 50001 | ✅/❌ | 🔴 High |
 | 2 | Empty string insert | `first_name = ''` | Stored as NULL | Stored as '' | ⚠️ | 🔴 High |
+| 3 | Spaces-only value | `first_name = ' '` | Kept as `' '` (not NULL) | Kept as `' '` — fails if `NULLIF(x, N'')`, `x <> N''`, or `LEN(x) = 0` is used | ✅/❌ | 🔴 High |
+| 4 | Case-only duplicate key | `'ABC'` and `'abc'` in a unique column | Both stored | Both stored only with a case-sensitive collation (default collation: error 2627) | ✅/❌ | 🔴 High |
+| 5 | Trailing-space duplicate key | `'ABC'` and `'ABC '` in a unique column | Both stored | Error 2627 — needs data cleanup | ⚠️ | 🔴 High |
+| 6 | Several NULLs in a unique column | Two rows with `tax_file_number = NULL` | Both stored | Both stored only with a filtered unique index | ✅/❌ | 🔴 High |
+| 7 | Invalid date text | `TO_DATE('2024-13-45', 'YYYY-MM-DD')` | Raises ORA-01843 | `CONVERT` raises 241 (`TRY_CONVERT` would return NULL) | ✅/❌ | 🔴 High |
+| 8 | Month-end arithmetic | `ADD_MONTHS(DATE '2024-02-29', 1)` | `2024-03-31` | `2024-03-31` only with the `EOMONTH` pattern | ✅/❌ | 🟡 Medium |
+| 9 | Multi-row trigger | `UPDATE` changing 3 rows | 3 audit rows | 3 audit rows (set-based trigger) | ✅/❌ | 🔴 High |
 
 ---
 ```
@@ -263,7 +336,7 @@ When validating all converted files:
 
 | # | File | Status | Critical | Warnings | Info | Structural | Semantic |
 |---|------|--------|----------|----------|------|------------|----------|
-| 1 | 01_datatypes.sql | ✅ | 0 | 1 | 2 | 8/8 | 8/8 |
+| 1 | 01_datatypes.sql | ✅ | 0 | 1 | 2 | 9/9 | 13/13 |
 
 ## Cross-File Dependencies
 | Source | Depends On | Status |
@@ -276,3 +349,9 @@ When validating all converted files:
 ## Action Items
 <Aggregated, deduplicated, prioritized>
 ```
+
+## References
+
+- Rules and their sources: [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) · [sources.md](../skills/oracle-tsql-reference/references/sources.md)
+- Post-load data checks: [reconciliation-queries.md](../skills/oracle-data-profiling/references/reconciliation-queries.md)
+- [Oracle Database 19c SQL Language Reference](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/) · [Transact-SQL reference](https://learn.microsoft.com/en-us/sql/t-sql/language-reference)

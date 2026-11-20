@@ -9,6 +9,9 @@ These are sample Oracle SQL files for testing the migration toolkit. They cover 
 | `03_plsql_procedure.sql` | 🟡 Moderate | Cursor FOR LOOP, %TYPE, exception handling, DBMS_OUTPUT |
 | `04_tricky_patterns.sql` | 🔴 Critical | CONNECT BY, (+) joins, empty-string=NULL, RETURNING INTO, BULK COLLECT |
 | `05_package_conversion.sql` | 🔴 Critical | Full package spec+body, REF CURSOR, session state, initialization block |
+| `06_oracle12c_semantics.sql` | 🔴 Critical | Identity columns, sequence defaults and triggers, bare `NUMBER` / `TIMESTAMP(9)`, case- and trailing-space-sensitive keys, nullable `UNIQUE`, `FETCH FIRST`, conversion-error defaults, date arithmetic, `ADD_MONTHS` / `GREATEST` edge cases, `MERGE … DELETE WHERE`, `FOR UPDATE NOWAIT` / `SKIP LOCKED`, global temporary table, database link synonym, caller-handled exceptions |
+
+The expected conversions for sample 06 are documented, with sources, in the [oracle-tsql-reference](../.github/skills/oracle-tsql-reference/SKILL.md) skill.
 
 ## How to Test
 

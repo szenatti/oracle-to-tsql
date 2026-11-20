@@ -723,5 +723,10 @@ All generated `.pq` files use these placeholders:
 2. **One result set per query** — Power Query consumes only the first result set. Split multi-result procedures into separate queries.
 3. **OUTPUT parameters don't map directly** — wrap them in a SELECT to return as a result set.
 4. **Test folding** — note which steps fold and which don't. Arrange foldable steps first.
-5. **Preserve Oracle semantics through T-SQL** — the M query should match the original Oracle behavior. If the T-SQL conversion has known semantic gaps (documented in validation reports), note them in the `.pq` file as migration warnings.
+5. **Preserve Oracle semantics through T-SQL** — the M query should match the original Oracle behavior. If the T-SQL conversion has known semantic gaps (documented in validation reports), note them in the `.pq` file as migration warnings. Power Query text comparisons are case-sensitive by default ([comparer functions](https://learn.microsoft.com/en-us/powerquery-m/comparer-functions)), unlike SQL Server's default collation, so a filter can return different rows depending on whether it folds; check such filters against [semantic-differences.md](../skills/oracle-tsql-reference/references/semantic-differences.md).
 6. **Placeholder parameters** — always include a `MIGRATION TODO` comment reminding users to replace `server_placeholder` and `database_placeholder`.
+
+## References
+
+- [Value.NativeQuery](https://learn.microsoft.com/en-us/powerquery-m/value-nativequery) · [Sql.Database](https://learn.microsoft.com/en-us/powerquery-m/sql-database) · [Query folding](https://learn.microsoft.com/en-us/power-query/query-folding-basics) · [Data types in Power Query](https://learn.microsoft.com/en-us/power-query/data-types)
+- Oracle → T-SQL rules behind the source T-SQL: [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md)
