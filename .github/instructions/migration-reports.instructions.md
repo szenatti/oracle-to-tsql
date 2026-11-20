@@ -113,8 +113,7 @@ Structure:
 2. **Part 1: Evaluation** — complexity, source Oracle version, target collation, object inventory, Oracle-specific features, semantic differences, dependencies, risks, recommendations, and data profiling queries for mappings pending profiling (created by `@oracle-evaluator`)
 3. **Part 2: Validation** — structural checks, semantic equivalence, completeness, findings, test scenarios (replaced by `@tsql-validator` at `<!-- PHASE:VALIDATION -->`)
 4. **Part 3: Performance Analysis** — query patterns, findings, index recommendations, optimized code, configuration, testing (replaced by `@performance-analyzer` at `<!-- PHASE:PERFORMANCE -->`)
-5. **Part 4: Power BI M-Language** — object inventory, conversion decisions, folding analysis, connection requirements, skipped objects, findings (replaced by `@m-language-converter` at `<!-- PHASE:M-LANGUAGE -->`)
-6. **Consolidated Action Items** — merged and deduplicated from all phases, sorted by severity (replaced by orchestrator at `<!-- PHASE:ACTIONS -->`)
+5. **Consolidated Action Items** — merged and deduplicated from all phases, sorted by severity (replaced by orchestrator at `<!-- PHASE:ACTIONS -->`)
 
 Section numbering uses hierarchical format: Part 1 subsections are `### 1.1`, `### 1.2`, etc.; Part 2 uses `### 2.1`, `### 2.2`, etc.
 

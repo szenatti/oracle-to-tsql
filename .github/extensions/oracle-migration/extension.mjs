@@ -6,18 +6,16 @@ import { existsSync } from "node:fs";
 const CWD = process.cwd();
 const ORACLE_DIR = join(CWD, "oracle-sql");
 const TSQL_DIR = join(CWD, "tsql-output");
-const PBI_DIR = join(CWD, "pbi-output");
 const REPORTS_DIR = join(CWD, "migration-reports");
 const STATE_FILE = join(REPORTS_DIR, ".migration-state.json");
 
 const SQL_EXTENSIONS = new Set([".sql", ".pls", ".pks", ".pkb", ".trg", ".vw", ".fnc", ".prc", ".typ"]);
-const PHASES = ["evaluate", "convert", "validate", "analyze", "m-language"];
+const PHASES = ["evaluate", "convert", "validate", "analyze"];
 const PHASE_AGENTS = {
     evaluate: "oracle-evaluator.md",
     convert: "oracle-to-tsql.md",
     validate: "tsql-validator.md",
     analyze: "performance-analyzer.md",
-    "m-language": "m-language-converter.md",
 };
 
 // --- File discovery ---
@@ -73,12 +71,7 @@ function ensureItem(state, relPath) {
             convert: "pending",
             validate: "pending",
             analyze: "pending",
-            "m-language": "pending",
         };
-    }
-    // Ensure m-language field exists for legacy state entries
-    if (!state[relPath]["m-language"]) {
-        state[relPath]["m-language"] = "pending";
     }
     return state[relPath];
 }
@@ -90,9 +83,6 @@ function oraclePath(relPath) {
 }
 function tsqlPath(relPath) {
     return join("tsql-output", relPath);
-}
-function pbiPath(relPath) {
-    return join("pbi-output", pathToSlug(relPath));
 }
 function reportPath(phase, relPath) {
     return join("migration-reports", `${phase}-${pathToSlug(relPath)}.md`);
@@ -109,16 +99,14 @@ const session = await joinSession({
             const prompt = input.prompt.toLowerCase();
             if (
                 prompt.includes("oracle") || prompt.includes("tsql") || prompt.includes("t-sql") ||
-                prompt.includes("migrat") || prompt.includes("convert") || prompt.includes("pbi") ||
-                prompt.includes("power bi") || prompt.includes("m-language") || prompt.includes("m language") ||
+                prompt.includes("migrat") || prompt.includes("convert") ||
                 prompt.includes("evaluat") || prompt.includes("validat") || prompt.includes("orchestrat")
             ) {
                 const oracleFiles = await collectSqlFiles(ORACLE_DIR);
                 const tsqlFiles = await collectSqlFiles(TSQL_DIR);
-                const pbiFiles = existsSync(PBI_DIR) ? await readdir(PBI_DIR).then(e => e.filter(f => f.endsWith(".pq"))) : [];
                 if (oracleFiles.length > 0 || tsqlFiles.length > 0) {
                     return {
-                        additionalContext: `Project status: ${oracleFiles.length} Oracle SQL source file(s), ${tsqlFiles.length} T-SQL output file(s), ${pbiFiles.length} PBI M-language file(s). Use migration_status for detailed per-file state.`,
+                        additionalContext: `Project status: ${oracleFiles.length} Oracle SQL source file(s), ${tsqlFiles.length} T-SQL output file(s). Use migration_status for detailed per-file state.`,
                     };
                 }
             }
@@ -193,8 +181,8 @@ const session = await joinSession({
                 properties: {
                     phase: {
                         type: "string",
-                        description: "Migration phase: 'evaluate', 'convert', 'validate', 'analyze', 'm-language', or 'full' for the complete pipeline.",
-                        enum: ["evaluate", "convert", "validate", "analyze", "m-language", "full"],
+                        description: "Migration phase: 'evaluate', 'convert', 'validate', 'analyze', or 'full' for the complete pipeline.",
+                        enum: ["evaluate", "convert", "validate", "analyze", "full"],
                     },
                 },
                 required: ["phase"],
@@ -212,7 +200,7 @@ const session = await joinSession({
                 for (const phase of phases) {
                     // Find files pending for this phase
                     // For convert/validate/analyze, require the prior phase to be done
-                    const priorPhase = { convert: "evaluate", validate: "convert", analyze: "validate", "m-language": "validate" }[phase];
+                    const priorPhase = { convert: "evaluate", validate: "convert", analyze: "validate" }[phase];
                     const pending = keys.filter((relPath) => {
                         const item = state[relPath];
                         if ((item[phase] || "pending") !== "pending") return false;
@@ -229,25 +217,18 @@ const session = await joinSession({
                         const out =
                             phase === "convert"
                                 ? tsqlPath(relPath)
-                                : phase === "m-language"
-                                    ? pbiPath(relPath)
-                                    : reportPath(phase, relPath);
+                                : reportPath(phase, relPath);
 
                         // Build the sub-agent prompt
                         const priorArtifacts = [];
                         if (phase !== "evaluate") {
                             priorArtifacts.push(`- Evaluation report: ${reportPath("evaluate", relPath)}`);
                         }
-                        if (phase === "validate" || phase === "analyze" || phase === "m-language") {
+                        if (phase === "validate" || phase === "analyze") {
                             priorArtifacts.push(`- Converted T-SQL: ${tsqlPath(relPath)}`);
                         }
                         if (phase === "analyze") {
                             priorArtifacts.push(`- Validation report: ${reportPath("validate", relPath)}`);
-                        }
-                        if (phase === "m-language") {
-                            priorArtifacts.push(`- Validation report: ${reportPath("validate", relPath)}`);
-                            // Performance report is optional context for m-language
-                            priorArtifacts.push(`- Performance report (if exists): ${reportPath("analyze", relPath)}`);
                         }
 
                         const prompt = [
@@ -306,7 +287,7 @@ const session = await joinSession({
                 type: "object",
                 properties: {
                     relPath: { type: "string", description: "Relative path of the Oracle SQL file (e.g., 'pkg_orders.sql' or 'schemas/hr/emp.sql')." },
-                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze", "m-language"] },
+                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze"] },
                 },
                 required: ["relPath", "phase"],
             },
@@ -335,7 +316,7 @@ const session = await joinSession({
                 type: "object",
                 properties: {
                     relPath: { type: "string", description: "Relative path of the Oracle SQL file." },
-                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze", "m-language"] },
+                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze"] },
                     artifactPath: { type: "string", description: "Path to the generated output file (report or T-SQL)." },
                 },
                 required: ["relPath", "phase"],
@@ -358,7 +339,7 @@ const session = await joinSession({
                 type: "object",
                 properties: {
                     relPath: { type: "string", description: "Relative path of the Oracle SQL file." },
-                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze", "m-language"] },
+                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze"] },
                     error: { type: "string", description: "Error message or reason for failure." },
                 },
                 required: ["relPath", "phase", "error"],
@@ -381,7 +362,7 @@ const session = await joinSession({
                 type: "object",
                 properties: {
                     relPath: { type: "string", description: "Relative path of the Oracle SQL file." },
-                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze", "m-language"] },
+                    phase: { type: "string", enum: ["evaluate", "convert", "validate", "analyze"] },
                 },
                 required: ["relPath", "phase"],
             },
@@ -411,7 +392,6 @@ const session = await joinSession({
                         if (name.startsWith("evaluation-") || name.startsWith("evaluate-")) type = "evaluation";
                         else if (name.startsWith("validation-")) type = "validation";
                         else if (name.startsWith("performance-")) type = "performance";
-                        else if (name.startsWith("m-language-")) type = "m-language";
                         else if (name.startsWith("migration-")) type = "consolidated";
                         else if (name.includes("summary")) type = "summary";
                         return { name, type, path: join("migration-reports", name) };
@@ -424,7 +404,7 @@ const session = await joinSession({
         {
             name: "generate_consolidated_report",
             description:
-                "Generates a single consolidated migration report per file by merging all phase reports (evaluate, validation, performance, m-language). Reads per-phase reports as source-of-truth and produces migration-<slug>.md.",
+                "Generates a single consolidated migration report per file by merging all phase reports (evaluate, validation, performance). Reads per-phase reports as source-of-truth and produces migration-<slug>.md.",
             parameters: {
                 type: "object",
                 properties: {
@@ -438,7 +418,6 @@ const session = await joinSession({
                     evaluate: reportPath("evaluate", args.relPath),
                     validate: reportPath("validate", args.relPath),
                     analyze: reportPath("analyze", args.relPath),
-                    "m-language": reportPath("m-language", args.relPath),
                 };
 
                 const sections = {};
@@ -478,9 +457,6 @@ const session = await joinSession({
                 if (sections.analyze) {
                     consolidated.push(`## 3. Performance Analysis`, ``, sections.analyze, ``, `---`, ``);
                 }
-                if (sections["m-language"]) {
-                    consolidated.push(`## 4. Power BI M-Language Conversion`, ``, sections["m-language"], ``);
-                }
 
                 await writeFile(join(CWD, outPath), consolidated.join("\n"));
                 return JSON.stringify({
@@ -498,7 +474,7 @@ const session = await joinSession({
             description: "Creates oracle-sql/, tsql-output/, migration-reports/ directories and initializes empty migration state.",
             parameters: { type: "object", properties: {} },
             handler: async () => {
-                const dirs = [ORACLE_DIR, TSQL_DIR, PBI_DIR, REPORTS_DIR];
+                const dirs = [ORACLE_DIR, TSQL_DIR, REPORTS_DIR];
                 const created = [];
                 for (const dir of dirs) {
                     if (!existsSync(dir)) {

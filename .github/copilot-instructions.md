@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project migrates Oracle SQL (PL/SQL) code to Microsoft SQL Server T-SQL. Oracle SQL files are placed in `oracle-sql/` and processed through a 5-phase pipeline: **evaluate → convert → validate → optimize → Power BI M-language**.
+This project migrates Oracle SQL (PL/SQL) code to Microsoft SQL Server T-SQL. Oracle SQL files are placed in `oracle-sql/` and processed through a 4-phase pipeline: **evaluate → convert → validate → optimize**.
 
 **Target Platform**: Microsoft SQL Server 2019+ (compatible with Azure SQL Database where noted)
 
@@ -11,7 +11,6 @@ This project migrates Oracle SQL (PL/SQL) code to Microsoft SQL Server T-SQL. Or
 ```
 oracle-sql/          → Drop Oracle SQL files here (source input, read-only)
 tsql-output/         → Converted T-SQL files (generated output)
-pbi-output/          → Power Query M files for Power BI (generated output)
 migration-reports/   → Consolidated migration reports (one per source file)
 samples/             → Sample Oracle files for testing the pipeline
 .github/skills/      → Conversion references loaded on demand (see below)
@@ -25,7 +24,6 @@ samples/             → Sample Oracle files for testing the pipeline
 | `@oracle-to-tsql` | Convert Oracle SQL to T-SQL | After evaluation — produce the T-SQL output |
 | `@tsql-validator` | Validate correctness and semantic equivalence | After conversion — catch bugs before deployment |
 | `@performance-analyzer` | Analyze performance and optimize | After validation — ensure production readiness |
-| `@m-language-converter` | Convert T-SQL to Power Query M | When Power BI reports must move from Oracle to SQL Server |
 | `@migration-orchestrator` | Batch process multiple files | When migrating many files at once |
 
 ## Workflow
@@ -35,7 +33,6 @@ samples/             → Sample Oracle files for testing the pipeline
 3. **Convert** with `@oracle-to-tsql` to generate T-SQL equivalents
 4. **Validate** with `@tsql-validator` to verify correctness
 5. **Optimize** with `@performance-analyzer` to ensure performance
-6. **Power BI** with `@m-language-converter` when reports need Power Query M
 
 For batch operations: `@migration-orchestrator migrate all`
 
@@ -49,8 +46,6 @@ The detailed mapping tables and patterns live in skills, so they load only when 
 |-------|----------|-----------|
 | [oracle-tsql-reference](skills/oracle-tsql-reference/SKILL.md) | [Semantic differences](skills/oracle-tsql-reference/references/semantic-differences.md), [data types](skills/oracle-tsql-reference/references/data-types.md), [functions](skills/oracle-tsql-reference/references/functions.md), [syntax and PL/SQL](skills/oracle-tsql-reference/references/syntax-and-plsql.md), [conversion patterns](skills/oracle-tsql-reference/references/conversion-patterns.md), [sources](skills/oracle-tsql-reference/references/sources.md) | Evaluating, converting, validating or optimizing any file |
 | [oracle-data-profiling](skills/oracle-data-profiling/SKILL.md) | Oracle profiling queries that settle data-dependent mappings; paired Oracle/T-SQL reconciliation queries | A mapping depends on the data, or data has been loaded |
-
-Power BI M-language rules live in `@m-language-converter` and `.github/instructions/pbi-output.instructions.md`.
 
 ---
 

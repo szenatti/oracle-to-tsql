@@ -1,5 +1,5 @@
 ---
-description: "Orchestrates multi-file Oracle-to-TSQL migration. Discovers files, runs the 5-phase pipeline (evaluate → convert → validate → analyze → m-language), and tracks progress. Each file gets a single consolidated migration report built incrementally by each phase."
+description: "Orchestrates multi-file Oracle-to-TSQL migration. Discovers files, runs the 4-phase pipeline (evaluate → convert → validate → analyze), and tracks progress. Each file gets a single consolidated migration report built incrementally by each phase."
 ---
 
 # Migration Orchestrator
@@ -48,7 +48,7 @@ migration_status
 
 ### Step 3: Process Each File
 
-For each Oracle SQL file that hasn't been processed yet, run the 5-phase pipeline **in order**:
+For each Oracle SQL file that hasn't been processed yet, run the 4-phase pipeline **in order**:
 
 #### Phase 1: Evaluate
 Read the file `.github/agents/oracle-evaluator.md` for rules, then:
@@ -79,16 +79,8 @@ Read the file `.github/agents/performance-analyzer.md` for rules, then:
 - Analyze for performance issues, cursor→set-based opportunities, index needs
 - **Replace** the `<!-- PHASE:PERFORMANCE -->` section in `migration-reports/migration-<filename>.md` with Part 3 (Performance)
 
-#### Phase 5: M-Language Conversion
-Read the file `.github/agents/m-language-converter.md` for rules, then:
-- Read the converted T-SQL file from `tsql-output/`
-- Read the original Oracle SQL and migration report for context
-- Convert T-SQL to Power Query M code
-- Produce one `.pq` file per logical object in `pbi-output/`
-- **Replace** the `<!-- PHASE:M-LANGUAGE -->` section in `migration-reports/migration-<filename>.md` with Part 4 (M-Language)
-
 #### After All Phases: Finalize Report
-After all 5 phases complete for a file, **replace** the `<!-- PHASE:ACTIONS -->` section in the consolidated report with a **Consolidated Action Items** table that merges and deduplicates action items from all phase findings (evaluation, validation, performance, m-language), sorted by severity (critical first).
+After all 4 phases complete for a file, **replace** the `<!-- PHASE:ACTIONS -->` section in the consolidated report with a **Consolidated Action Items** table that merges and deduplicates action items from all phase findings (evaluation, validation, performance), sorted by severity (critical first).
 
 Use this template for the replacement:
 
@@ -103,7 +95,6 @@ Use this template for the replacement:
 | 1 | Evaluation | 🔴 Must Fix | F-001 | <specific action> | ⬜ Open |
 | 2 | Validation | 🔴 Must Fix | F-001 | <specific action> | ⬜ Open |
 | 3 | Performance | 🟡 Should Fix | P-001 | <specific action> | ⬜ Open |
-| 4 | M-Language | 🟢 Consider | M-001 | <specific action> | ⬜ Open |
 ```
 
 ### Step 4: Report Progress
@@ -111,11 +102,11 @@ Use this template for the replacement:
 After each file completes, show a status summary:
 
 ```
-| File | Evaluated | Converted | Validated | Analyzed | M-Language |
-|------|-----------|-----------|-----------|----------|------------|
-| file1.sql | ✅ | ✅ | ✅ | ✅ | ✅ |
-| file2.sql | ✅ | ✅ | ⬜ | ⬜ | ⬜ |
-| file3.sql | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| File | Evaluated | Converted | Validated | Analyzed |
+|------|-----------|-----------|-----------|----------|
+| file1.sql | ✅ | ✅ | ✅ | ✅ |
+| file2.sql | ✅ | ✅ | ⬜ | ⬜ |
+| file3.sql | ⬜ | ⬜ | ⬜ | ⬜ |
 ```
 
 Each file has a single consolidated report at `migration-reports/migration-<filename>.md` that is built incrementally as phases complete.
@@ -130,7 +121,7 @@ When the `task` tool is available, you can dispatch sub-agents for parallel proc
 4. After completion, use `complete_work_item` or `fail_work_item` to update state
 5. Process in batches of 5, waiting for each batch to finish
 
-**Note**: Phases must run sequentially (evaluate → convert → validate → analyze → m-language) because each phase writes to the same consolidated report file. Within each phase, multiple files can be processed in parallel.
+**Note**: Phases must run sequentially (evaluate → convert → validate → analyze) because each phase writes to the same consolidated report file. Within each phase, multiple files can be processed in parallel.
 
 Each sub-agent prompt should instruct the agent to:
 - Read the relevant `.github/agents/<phase-agent>.md` for rules
@@ -142,18 +133,17 @@ Each sub-agent prompt should instruct the agent to:
 
 | Request | Action |
 |---------|--------|
-| "migrate all" | Full pipeline: evaluate → convert → validate → analyze → m-language → finalize report for all files |
+| "migrate all" | Full pipeline: evaluate → convert → validate → analyze → finalize report for all files |
 | "evaluate all" | Run evaluate phase on all unevaluated files |
 | "convert all" | Run convert phase on all unconverted files |
 | "validate all" | Run validate phase on all unvalidated files |
 | "analyze all" | Run analyze phase on all unanalyzed files |
-| "m-language all" | Run m-language phase on all files with validate done |
 | "status" | Show which files have been processed through which phases |
 | "<phase> <file>" | Run one phase on one specific file |
 
 ## Important Notes
 
-- **Phase order matters**: evaluate → convert → validate → analyze → m-language. Don't skip phases.
+- **Phase order matters**: evaluate → convert → validate → analyze. Don't skip phases.
 - **Each phase writes to a single consolidated report**: `migration-reports/migration-<filename>.md`. The evaluate phase creates it; subsequent phases replace their placeholder sections using `<!-- PHASE:* -->` markers.
 - **Finalize the report after all phases**: Replace the `<!-- PHASE:ACTIONS -->` placeholder with merged, deduplicated action items from all phases.
 - **Read the agent rules**: Before each phase, read the corresponding agent `.md` file for detailed conversion rules and report templates.

@@ -122,9 +122,9 @@ Rate each file:
 
 ### 4. Generate Report
 
-Create the consolidated migration report at `migration-reports/migration-<filename>.md`. The evaluator is the **first phase** and creates this file with a full skeleton. Subsequent phases (validate, analyze, m-language) will **replace their placeholder sections**.
+Create the consolidated migration report at `migration-reports/migration-<filename>.md`. The evaluator is the **first phase** and creates this file with a full skeleton. Subsequent phases (validate, analyze) will **replace their placeholder sections**.
 
-Write the full report skeleton with **Part 1: Evaluation** filled in and placeholder markers for Parts 2–4. Use this structure:
+Write the full report skeleton with **Part 1: Evaluation** filled in and placeholder markers for Parts 2–3. Use this structure:
 
 ```markdown
 # Migration Report: <filename>
@@ -250,20 +250,13 @@ SELECT ... ;
 
 ---
 
-<!-- PHASE:M-LANGUAGE -->
-## Part 4: Power BI M-Language
-
-> _Pending — will be filled by `@m-language-converter`_
-
----
-
 <!-- PHASE:ACTIONS -->
 ## Consolidated Action Items
 
 > _Pending — will be generated after all phases complete._
 ```
 
-**IMPORTANT**: The placeholder markers (`<!-- PHASE:VALIDATION -->`, `<!-- PHASE:PERFORMANCE -->`, `<!-- PHASE:M-LANGUAGE -->`, `<!-- PHASE:ACTIONS -->`) are critical. Each subsequent phase will find its marker and replace the section from the marker through to the next `---` separator.
+**IMPORTANT**: The placeholder markers (`<!-- PHASE:VALIDATION -->`, `<!-- PHASE:PERFORMANCE -->`, `<!-- PHASE:ACTIONS -->`) are critical. Each subsequent phase will find its marker and replace the section from the marker through to the next `---` separator.
 
 ## Batch Evaluation
 
