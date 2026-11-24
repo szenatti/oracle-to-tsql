@@ -21,19 +21,19 @@ const PHASE_AGENTS = {
 
 // --- File discovery ---
 
-async function collectSqlFiles(dir) {
+async function collectSqlFiles(dir, root = dir) {
     const results = [];
     if (!existsSync(dir)) return results;
     const entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
         const fullPath = join(dir, entry.name);
         if (entry.isDirectory()) {
-            results.push(...(await collectSqlFiles(fullPath)));
+            results.push(...(await collectSqlFiles(fullPath, root)));
         } else if (entry.isFile() && SQL_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
             const stats = await stat(fullPath);
             const content = await readFile(fullPath, "utf-8");
             results.push({
-                relPath: relative(dir, fullPath),
+                relPath: toPosixPath(relative(root, fullPath)),
                 size: stats.size,
                 lines: content.split("\n").length,
                 modified: stats.mtime.toISOString(),
@@ -46,6 +46,22 @@ async function collectSqlFiles(dir) {
 // Relative path → slug for report filenames (preserves subdirs as dashes)
 function pathToSlug(relPath) {
     return relPath.replace(/[\\/]/g, "--").replace(/\.[^.]+$/, "");
+}
+
+// relPath is always stored with "/" so Windows and macOS/Linux produce the same state keys
+function toPosixPath(p) {
+    return p.replace(/\\/g, "/");
+}
+
+function normalizeRelPathArgs(tools) {
+    return tools.map((tool) => ({
+        ...tool,
+        handler: (args, ...rest) =>
+            tool.handler(
+                args && typeof args.relPath === "string" ? { ...args, relPath: toPosixPath(args.relPath) } : args,
+                ...rest,
+            ),
+    }));
 }
 
 // --- Excluded objects (backup, dated and leftover tables) ---
@@ -94,11 +110,19 @@ function exclusionPromptSection(phase, fileResult) {
 
 async function loadState() {
     if (!existsSync(STATE_FILE)) return {};
+    let raw;
     try {
-        return JSON.parse(await readFile(STATE_FILE, "utf-8"));
+        raw = JSON.parse(await readFile(STATE_FILE, "utf-8"));
     } catch {
         return {};
     }
+    // Older Windows runs stored "a\b.sql"; prefer the "/" entry if both exist
+    const state = {};
+    for (const [key, value] of Object.entries(raw)) {
+        const posix = toPosixPath(key);
+        if (!(posix in state) || posix === key) state[posix] = value;
+    }
+    return state;
 }
 
 async function saveState(state) {
@@ -155,7 +179,7 @@ const session = await joinSession({
             }
         },
     },
-    tools: [
+    tools: normalizeRelPathArgs([
         // ── Discovery ──
         {
             name: "scan_oracle_files",
@@ -335,7 +359,7 @@ const session = await joinSession({
                             `## Output Path`,
                             `\`${out}\``,
                             ...(phase === "convert"
-                                ? [``, `Ensure parent directories exist before writing (use mkdir -p if needed).`]
+                                ? [``, `Create the parent folders of the output path first if they don't exist.`]
                                 : []),
                             ...(phase === "analyze" ? [] : exclusionPromptSection(phase, exclusions.files[relPath])),
                         ].join("\n");
@@ -577,5 +601,5 @@ const session = await joinSession({
                 });
             },
         },
-    ],
+    ]),
 });

@@ -10,7 +10,7 @@ You are a migration project manager. You orchestrate converting multiple Oracle 
 
 You may be running in **VS Code Copilot Chat** or **Copilot CLI**. Adapt your approach:
 
-- **If you have terminal access** (VS Code or CLI): use shell commands like `ls`, `find`, `cat` to discover and read files
+- **If you have terminal access** (VS Code or CLI): use the terminal's own commands to list and read files. That's bash or zsh on macOS and Linux, and usually PowerShell on Windows. Don't use bash-only syntax (`2>/dev/null`, `ls -la`, `mkdir -p`, `rm -f`) in PowerShell; on Windows, `find` searches text rather than files.
 - **If you have `scan_oracle_files` / `generate_batch_plan` tools**: use them (these are Copilot CLI extension tools)
 - **If you have the `task` tool**: dispatch sub-agents in parallel for faster processing
 - **If you DON'T have `task`**: process files sequentially — this is fine and expected in VS Code
@@ -19,11 +19,16 @@ You may be running in **VS Code Copilot Chat** or **Copilot CLI**. Adapt your ap
 
 ### Step 1: Discover Files
 
-Find all SQL files in `oracle-sql/`:
+Find all SQL files in `oracle-sql/`, including subfolders:
 
-**Using terminal** (works everywhere):
+**Using terminal** (macOS / Linux):
 ```
-ls -la oracle-sql/
+find oracle-sql -type f
+```
+
+**Using terminal** (Windows PowerShell):
+```
+Get-ChildItem oracle-sql -Recurse -File | Select-Object -ExpandProperty FullName
 ```
 
 **Using extension tool** (CLI only):
@@ -35,10 +40,16 @@ scan_oracle_files
 
 Determine what's already been processed by checking which output files exist:
 
-**Using terminal**:
+**Using terminal** (macOS / Linux):
 ```
-echo "=== Converted ===" && ls tsql-output/ 2>/dev/null
+echo "=== Converted ===" && ls -R tsql-output/ 2>/dev/null
 echo "=== Reports ===" && ls migration-reports/ 2>/dev/null
+```
+
+**Using terminal** (Windows PowerShell):
+```
+"=== Converted ==="; Get-ChildItem tsql-output -Recurse -File -ErrorAction SilentlyContinue
+"=== Reports ==="; Get-ChildItem migration-reports -File -ErrorAction SilentlyContinue
 ```
 
 **Using extension tool** (CLI only):

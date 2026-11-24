@@ -95,6 +95,7 @@ test("invalid override entries are reported, not thrown", () => {
     assert.equal(parseOverrides("{ not json").errors.length, 1);
     assert.equal(parseOverrides("null").errors.length, 1);
     assert.deepEqual(parseOverrides('{"include": {}}').errors, ['"include" must be an array']);
+    assert.deepEqual(parseOverrides('\uFEFF{"include": []}').errors, []);
 });
 
 test("sample 07 gives the documented results", () => {

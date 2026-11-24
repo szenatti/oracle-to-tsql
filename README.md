@@ -12,6 +12,7 @@ A GitHub Copilot-powered toolkit for migrating Oracle SQL/PL/SQL code to Microso
    ```bash
    cp samples/*.sql oracle-sql/
    ```
+   This works in bash, zsh and PowerShell. In Windows `cmd.exe`, use `copy samples\*.sql oracle-sql\`.
 2. **Run the full pipeline**: `@migration-orchestrator migrate all`
 3. **Check status**: `@migration-orchestrator status`
 4. **Review results** in `tsql-output/` and `migration-reports/`
@@ -27,11 +28,13 @@ The agents check behaviour they're unsure about against official documentation t
 | [Microsoft Learn MCP](https://learn.microsoft.com/en-us/training/support/mcp) | SQL Server, Azure SQL, T-SQL | Hosted; nothing to install |
 | [Oracle Database Documentation MCP](https://github.com/oracle/mcp/blob/main/src/oracle-db-doc-mcp-server/README.md) | Oracle SQL and PL/SQL | Local Python server with a documentation index you build once |
 
-Register them in your user configuration so every workspace can use them. This repo doesn't ship a `.vscode/mcp.json`, because the Oracle server path is machine-specific.
+Register them in your user configuration so every workspace can use them. This repo doesn't ship an MCP configuration, because the Oracle server path is machine-specific.
 
 ### Install the Oracle server
 
-Needs Python 3.13+ and [uv](https://docs.astral.sh/uv/). Index the documentation for the Oracle version you migrate from; the rules in this repo cite 19c.
+Needs Python 3.13+ and [uv](https://docs.astral.sh/uv/). Index the documentation for the Oracle version you migrate from; the rules in this repo cite 19c. Everything goes under `.oracle` in your home folder.
+
+macOS / Linux:
 
 ```bash
 git clone https://github.com/oracle/mcp.git ~/.oracle/mcp-src
@@ -43,38 +46,89 @@ curl -L -o ~/.oracle/oracle-database_19.zip \
 .venv/bin/python3 oracle-db-doc-mcp-server.py idx -path ~/.oracle/oracle-database_19.zip
 ```
 
-The index is stored in `~/.oracle/oracle-db-doc-mcp-server/`. Building it takes several minutes; run `idx` again to refresh it. The official Docker image (`ghcr.io/oracle/mcp/oracle-db-doc`) builds in the 26ai index, which doesn't match 19c sources.
+Windows (PowerShell):
 
-If your package index doesn't have every version in `uv.lock` yet (common with corporate mirrors), keep the current script and install the previous lock, which pins FastMCP 3.4.10. Don't run scripts older than commit `aa3294b`: their searches fail with a SQLite "objects created in a thread" error.
+```powershell
+git clone https://github.com/oracle/mcp.git "$HOME\.oracle\mcp-src"
+Set-Location "$HOME\.oracle\mcp-src\src\oracle-db-doc-mcp-server"
+uv sync --locked --no-dev
+
+curl.exe -L -o "$HOME\.oracle\oracle-database_19.zip" `
+  https://docs.oracle.com/en/database/oracle/oracle-database/19/zip/oracle-database_19.zip
+.\.venv\Scripts\python.exe oracle-db-doc-mcp-server.py idx -path "$HOME\.oracle\oracle-database_19.zip"
+```
+
+Use `curl.exe`, not `curl`: in Windows PowerShell 5.1, `curl` is an alias for `Invoke-WebRequest`. The server has been tested on macOS only.
+
+The index is stored in `.oracle/oracle-db-doc-mcp-server/` under your home folder (`~` on macOS/Linux, `%USERPROFILE%` on Windows). Building it takes several minutes; run `idx` again to refresh it. The official Docker image (`ghcr.io/oracle/mcp/oracle-db-doc`) builds in the 26ai index, which doesn't match 19c sources.
+
+If your package index doesn't have every version in `uv.lock` yet (common with corporate mirrors), keep the current script and install the previous lock, which pins FastMCP 3.4.10. Don't run scripts older than commit `aa3294b`: their searches fail with a SQLite "objects created in a thread" error. The steps check the previous lock out into a temporary git worktree, so no file is rewritten by the shell.
+
+macOS / Linux:
 
 ```bash
-mkdir -p /tmp/prev && cd ~/.oracle/mcp-src
+cd ~/.oracle/mcp-src
 git fetch --depth 50 origin main
-git show 6ea29c1:src/oracle-db-doc-mcp-server/pyproject.toml > /tmp/prev/pyproject.toml
-git show 6ea29c1:src/oracle-db-doc-mcp-server/uv.lock > /tmp/prev/uv.lock
-(cd /tmp/prev && uv export --locked --no-dev --no-emit-project -o requirements.txt)
+git worktree add ~/.oracle/mcp-prev 6ea29c1
+uv export --project ~/.oracle/mcp-prev/src/oracle-db-doc-mcp-server --locked --no-dev --no-emit-project -o ~/.oracle/requirements-prev.txt
+git worktree remove ~/.oracle/mcp-prev
+
 cd src/oracle-db-doc-mcp-server
-python3.13 -m venv .venv && .venv/bin/pip install --require-hashes -r /tmp/prev/requirements.txt
+python3.13 -m venv .venv
+.venv/bin/pip install --require-hashes -r ~/.oracle/requirements-prev.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+Set-Location "$HOME\.oracle\mcp-src"
+git fetch --depth 50 origin main
+git worktree add "$HOME\.oracle\mcp-prev" 6ea29c1
+uv export --project "$HOME\.oracle\mcp-prev\src\oracle-db-doc-mcp-server" --locked --no-dev --no-emit-project -o "$HOME\.oracle\requirements-prev.txt"
+git worktree remove "$HOME\.oracle\mcp-prev"
+
+Set-Location src\oracle-db-doc-mcp-server
+py -3.13 -m venv .venv
+.\.venv\Scripts\pip.exe install --require-hashes -r "$HOME\.oracle\requirements-prev.txt"
 ```
 
 ### Register both servers
 
-VS Code: run **MCP: Open User Configuration** and add:
+VS Code (Copilot) and Copilot CLI read the same user file: `~/.copilot/mcp-config.json` on macOS/Linux, `%USERPROFILE%\.copilot\mcp-config.json` on Windows, or `mcp-config.json` in `COPILOT_HOME` if you set it. In VS Code you can also run **Chat: Open Customizations** → **MCP Servers** → **Add Server** → **Global** → **Copilot Global**. Add both servers under `mcpServers`.
+
+macOS / Linux:
 
 ```json
 {
-  "servers": {
-    "microsoft-learn": { "type": "http", "url": "https://learn.microsoft.com/api/mcp" },
+  "mcpServers": {
+    "microsoft-learn": { "type": "http", "url": "https://learn.microsoft.com/api/mcp", "tools": ["*"] },
     "oracle-db-doc": {
       "type": "stdio",
-      "command": "/Users/<you>/.oracle/mcp-src/src/oracle-db-doc-mcp-server/.venv/bin/python3",
-      "args": ["/Users/<you>/.oracle/mcp-src/src/oracle-db-doc-mcp-server/oracle-db-doc-mcp-server.py", "mcp"]
+      "command": "${HOME}/.oracle/mcp-src/src/oracle-db-doc-mcp-server/.venv/bin/python3",
+      "args": ["${HOME}/.oracle/mcp-src/src/oracle-db-doc-mcp-server/oracle-db-doc-mcp-server.py", "mcp"],
+      "tools": ["*"]
     }
   }
 }
 ```
 
-Copilot CLI: add the same servers under `mcpServers` in `~/.copilot/mcp-config.json`, with `"type": "local"` for `oracle-db-doc` and `"tools": ["*"]` on each.
+Windows:
+
+```json
+{
+  "mcpServers": {
+    "microsoft-learn": { "type": "http", "url": "https://learn.microsoft.com/api/mcp", "tools": ["*"] },
+    "oracle-db-doc": {
+      "type": "stdio",
+      "command": "${USERPROFILE}\\.oracle\\mcp-src\\src\\oracle-db-doc-mcp-server\\.venv\\Scripts\\python.exe",
+      "args": ["${USERPROFILE}\\.oracle\\mcp-src\\src\\oracle-db-doc-mcp-server\\oracle-db-doc-mcp-server.py", "mcp"],
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+Backslashes are doubled because the file is JSON. If the `${HOME}` or `${USERPROFILE}` reference isn't expanded on your setup, write the full path instead.
 
 ## Project Structure
 

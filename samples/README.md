@@ -40,6 +40,8 @@ Sample 06 also gets one flag: its `TMP_ORDER_IMPORT` matches `TMP_`, but it's a 
 cp samples/*.sql oracle-sql/
 ```
 
+This works in bash, zsh and PowerShell. In Windows `cmd.exe`, use `copy samples\*.sql oracle-sql\`.
+
 ### Step 2: Run the full migration pipeline
 
 Using the batch orchestrator (processes all files in parallel):
@@ -74,9 +76,18 @@ Or run each phase individually:
 
 To reset and start fresh:
 
+macOS / Linux:
+
 ```bash
 rm oracle-sql/*.sql tsql-output/*.sql migration-reports/*.md
 rm -f migration-reports/.migration-state.json
+```
+
+Windows (PowerShell):
+
+```powershell
+Remove-Item oracle-sql\*.sql, tsql-output\*.sql, migration-reports\*.md -ErrorAction SilentlyContinue
+Remove-Item migration-reports\.migration-state.json -Force -ErrorAction SilentlyContinue
 ```
 
 ## Single File Testing

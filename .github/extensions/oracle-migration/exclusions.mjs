@@ -387,7 +387,8 @@ export function parseOverrides(json) {
     const result = { ...emptyOverrides(), found: true };
     let data;
     try {
-        data = JSON.parse(json);
+        // Windows editors and PowerShell 5.1 often save UTF-8 with a byte-order mark
+        data = JSON.parse(json.replace(/^\uFEFF/, ""));
     } catch (e) {
         result.errors.push(`${OVERRIDES_FILE} is not valid JSON: ${e.message}`);
         return result;

@@ -42,6 +42,7 @@ How to use this Oracle-to-TSQL migration toolkit with **GitHub Copilot CLI** and
    cd oracle-to-tsql
    code .
    ```
+   On macOS, `code` works only after running **Shell Command: Install 'code' command in PATH** from the VS Code command palette. The Windows installer adds it for you.
 
 2. **Drop your Oracle SQL files** into the `oracle-sql/` folder (drag-and-drop or copy).
 
@@ -118,6 +119,7 @@ This means even **regular Copilot Chat** (without `@agent`) gives migration-awar
    ```bash
    cp /path/to/your/oracle-files/*.sql oracle-sql/
    ```
+   You can also copy whole folders (`cp -R` in bash, `Copy-Item -Recurse` in PowerShell); output keeps the same relative paths. In Windows `cmd.exe`, use `copy`.
 
 3. **Start a Copilot CLI session**:
    ```bash
@@ -412,7 +414,7 @@ If `migration_status` shows stale data:
 # Reset all state (Unix/macOS/WSL)
 rm -f migration-reports/.migration-state.json
 # Windows PowerShell
-Remove-Item migration-reports/.migration-state.json -ErrorAction SilentlyContinue
+Remove-Item migration-reports/.migration-state.json -Force -ErrorAction SilentlyContinue
 # Then re-scan
 > scan all oracle files
 ```
