@@ -19,6 +19,8 @@ Rules in this skill are paraphrased and linked, not copied. Oracle and Microsoft
 
 The SQL Server behaviours marked "verified" were reproduced on SQL Server 2022 with the default `SQL_Latin1_General_CP1_CI_AS` collation. They cover string padding, collation, `UNIQUE` and NULL, `DECIMAL` rounding, `TRY_CONVERT`, `DATEDIFF`/`DATEADD`, `GREATEST`, `TINYINT` range, `STRING_AGG` limits, GUID byte order, `CONVERT` styles, `XACT_ABORT`, `MERGE`, triggers and lock hints. Oracle behaviour is cited from the Oracle 19c documentation and wasn't executed.
 
+Agents can also look behaviour up through the Microsoft Learn and Oracle Database Documentation MCP servers ([Verifying assumptions](../SKILL.md#verifying-assumptions)). Those lookups check rules against the same official documentation; they aren't a separate source and don't count as "verified". A rule changes only when someone updates these reference files and cites the page. The Oracle server searches a local index of the 19c documentation, so it doesn't cover features added in later releases.
+
 ## Version-dependent Oracle features
 
 The evaluator records the source Oracle version because these features change the conversion:

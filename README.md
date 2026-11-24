@@ -18,6 +18,64 @@ A GitHub Copilot-powered toolkit for migrating Oracle SQL/PL/SQL code to Microso
 
 > See [samples/README.md](samples/README.md) for detailed testing instructions.
 
+## Documentation MCP Servers
+
+The agents check behaviour they're unsure about against official documentation through two MCP servers. They work without them, but anything they couldn't check is marked `-- MIGRATION WARNING: unverified`. Rules for using them: [Verifying assumptions](.github/skills/oracle-tsql-reference/SKILL.md#verifying-assumptions).
+
+| Server | Covers | Setup |
+|--------|--------|-------|
+| [Microsoft Learn MCP](https://learn.microsoft.com/en-us/training/support/mcp) | SQL Server, Azure SQL, T-SQL | Hosted; nothing to install |
+| [Oracle Database Documentation MCP](https://github.com/oracle/mcp/blob/main/src/oracle-db-doc-mcp-server/README.md) | Oracle SQL and PL/SQL | Local Python server with a documentation index you build once |
+
+Register them in your user configuration so every workspace can use them. This repo doesn't ship a `.vscode/mcp.json`, because the Oracle server path is machine-specific.
+
+### Install the Oracle server
+
+Needs Python 3.13+ and [uv](https://docs.astral.sh/uv/). Index the documentation for the Oracle version you migrate from; the rules in this repo cite 19c.
+
+```bash
+git clone https://github.com/oracle/mcp.git ~/.oracle/mcp-src
+cd ~/.oracle/mcp-src/src/oracle-db-doc-mcp-server
+uv sync --locked --no-dev
+
+curl -L -o ~/.oracle/oracle-database_19.zip \
+  https://docs.oracle.com/en/database/oracle/oracle-database/19/zip/oracle-database_19.zip
+.venv/bin/python3 oracle-db-doc-mcp-server.py idx -path ~/.oracle/oracle-database_19.zip
+```
+
+The index is stored in `~/.oracle/oracle-db-doc-mcp-server/`. Building it takes several minutes; run `idx` again to refresh it. The official Docker image (`ghcr.io/oracle/mcp/oracle-db-doc`) builds in the 26ai index, which doesn't match 19c sources.
+
+If your package index doesn't have every version in `uv.lock` yet (common with corporate mirrors), keep the current script and install the previous lock, which pins FastMCP 3.4.10. Don't run scripts older than commit `aa3294b`: their searches fail with a SQLite "objects created in a thread" error.
+
+```bash
+mkdir -p /tmp/prev && cd ~/.oracle/mcp-src
+git fetch --depth 50 origin main
+git show 6ea29c1:src/oracle-db-doc-mcp-server/pyproject.toml > /tmp/prev/pyproject.toml
+git show 6ea29c1:src/oracle-db-doc-mcp-server/uv.lock > /tmp/prev/uv.lock
+(cd /tmp/prev && uv export --locked --no-dev --no-emit-project -o requirements.txt)
+cd src/oracle-db-doc-mcp-server
+python3.13 -m venv .venv && .venv/bin/pip install --require-hashes -r /tmp/prev/requirements.txt
+```
+
+### Register both servers
+
+VS Code: run **MCP: Open User Configuration** and add:
+
+```json
+{
+  "servers": {
+    "microsoft-learn": { "type": "http", "url": "https://learn.microsoft.com/api/mcp" },
+    "oracle-db-doc": {
+      "type": "stdio",
+      "command": "/Users/<you>/.oracle/mcp-src/src/oracle-db-doc-mcp-server/.venv/bin/python3",
+      "args": ["/Users/<you>/.oracle/mcp-src/src/oracle-db-doc-mcp-server/oracle-db-doc-mcp-server.py", "mcp"]
+    }
+  }
+}
+```
+
+Copilot CLI: add the same servers under `mcpServers` in `~/.copilot/mcp-config.json`, with `"type": "local"` for `oracle-db-doc` and `"tools": ["*"]` on each.
+
 ## Project Structure
 
 ```

@@ -47,6 +47,10 @@ The detailed mapping tables and patterns live in skills, so they load only when 
 | [oracle-tsql-reference](skills/oracle-tsql-reference/SKILL.md) | [Semantic differences](skills/oracle-tsql-reference/references/semantic-differences.md), [data types](skills/oracle-tsql-reference/references/data-types.md), [functions](skills/oracle-tsql-reference/references/functions.md), [syntax and PL/SQL](skills/oracle-tsql-reference/references/syntax-and-plsql.md), [conversion patterns](skills/oracle-tsql-reference/references/conversion-patterns.md), [sources](skills/oracle-tsql-reference/references/sources.md) | Evaluating, converting, validating or optimizing any file |
 | [oracle-data-profiling](skills/oracle-data-profiling/SKILL.md) | Oracle profiling queries that settle data-dependent mappings; paired Oracle/T-SQL reconciliation queries | A mapping depends on the data, or data has been loaded |
 
+### Verifying assumptions
+
+When the reference files don't settle a behaviour, check the official docs through MCP instead of guessing. Use **Microsoft Learn MCP** (`microsoft_docs_search`, `microsoft_docs_fetch`) for SQL Server and Azure SQL, and the **Oracle Database Documentation MCP** (`search_oracle_database_documentation`) for Oracle. The reference files still win: if the docs disagree, keep the rule, add a `-- MIGRATION WARNING:` and propose the change in the report. Cite URLs rather than copying text. If a server is unavailable, mark the point `-- MIGRATION WARNING: unverified`. Full rules: [Verifying assumptions](skills/oracle-tsql-reference/SKILL.md#verifying-assumptions).
+
 ---
 
 ## ⚠️ Critical Semantic Rules (always apply)

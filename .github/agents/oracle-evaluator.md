@@ -96,6 +96,8 @@ Conversion approaches for all of these are in [conversion-patterns.md](../skills
 #### Source Oracle Version
 Record the source Oracle version from the file header, the user, or the features used. Version-dependent features (identity columns, `FETCH FIRST`, `DEFAULT … ON CONVERSION ERROR`, private temporary tables, SQL `BOOLEAN`, `IF [NOT] EXISTS`) are listed with sources in [sources.md](../skills/oracle-tsql-reference/references/sources.md#version-dependent-oracle-features). If nothing identifies it, record "unknown — no version-specific features".
 
+For a feature that isn't listed there, or isn't covered by the reference files, look it up with the Oracle Database Documentation MCP (`search_oracle_database_documentation`) before rating its risk. Follow [Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions) and cite the `docs.oracle.com` page in the report.
+
 #### Data-Dependent Mappings
 When a mapping depends on the data (bare `NUMBER`, `NUMBER(1)`–`NUMBER(4)`, `DATE` time parts, `TIMESTAMP(8|9)`, nullable or string `UNIQUE` keys, `CHAR`-semantics lengths), mark it **pending profiling**. Generate the matching Oracle queries from the [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md) skill for report section 1.7.
 

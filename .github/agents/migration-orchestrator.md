@@ -150,6 +150,7 @@ Each sub-agent prompt should instruct the agent to:
 - **One file at a time in VS Code**: Process sequentially. This is expected behavior — not an error.
 - **Check existing output**: Skip files that already have output from a given phase (don't re-process unless asked).
 - **Large file sets**: For many files, confirm with the user before starting. Show the plan first.
+- **Documentation MCP servers**: Before starting, check that the Microsoft Learn and Oracle Database Documentation MCP tools are available, and say in the plan if either is missing. Phases still run without them, but points they can't check are marked `-- MIGRATION WARNING: unverified` ([Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions)). When merging action items, keep every proposed reference-file change the phases raised.
 
 ## Error Handling
 

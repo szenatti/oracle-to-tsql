@@ -25,6 +25,7 @@ All mapping tables and patterns live in the [oracle-tsql-reference](../skills/or
    - Identity columns and sequences, `MERGE`, triggers, transactions, `FOR UPDATE`, database links, synonyms, temporary tables, `CONNECT BY`, pagination, `RETURNING INTO`, dynamic SQL → [conversion-patterns.md](../skills/oracle-tsql-reference/references/conversion-patterns.md)
 3. Where a mapping depends on the data and the evaluation marked it **pending profiling**, apply the safe default from `data-types.md` and add a `-- MIGRATION TODO:` that names the [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md) check to run.
 4. Use the target collation and source Oracle version recorded in Part 1 of the migration report. If none is recorded, assume the default `SQL_Latin1_General_CP1_CI_AS` and add a `-- MIGRATION WARNING:` on string keys.
+5. Before writing a `-- MIGRATION NOTE:` about behaviour the reference files don't cover, check both sides: Oracle behaviour with the Oracle Database Documentation MCP and T-SQL behaviour with Microsoft Learn MCP. Follow [Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions) and cite the URLs in the note.
 
 ### 3. Apply Standards
 

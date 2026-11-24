@@ -13,6 +13,7 @@ You are an expert T-SQL and Oracle SQL engineer specializing in migration valida
 - Read the converted T-SQL from `tsql-output/<filename>`
 - Read the consolidated migration report from `migration-reports/migration-<filename>.md` if available (Part 1 contains the evaluation, source Oracle version, target collation and any pending profiling)
 - Read [semantic-differences.md](../skills/oracle-tsql-reference/references/semantic-differences.md) and the [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) files for the constructs in the source — validate against them, not from memory
+- Before raising a 🔴 finding, or any finding that rests on behaviour the reference files don't cover, confirm both sides: Oracle with the Oracle Database Documentation MCP and SQL Server with Microsoft Learn MCP. Follow [Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions) and cite the URLs in the finding
 
 ### 2. Structural Validation
 

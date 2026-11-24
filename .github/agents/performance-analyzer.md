@@ -137,6 +137,8 @@ Look for opportunities to use SQL Server features that don't exist in Oracle:
 - **In-memory OLTP**: For high-throughput OLTP operations
 - **Query Store**: Recommend enabling for monitoring migrated query performance
 
+Before recommending a feature, confirm with Microsoft Learn MCP (`microsoft_docs_search`) that the target supports it: SQL Server version, edition, compatibility level or Azure SQL tier. Cite the Learn page. See [Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions).
+
 ### 4. Execution Plan Recommendations
 
 For complex queries, suggest how to analyze actual execution plans:
