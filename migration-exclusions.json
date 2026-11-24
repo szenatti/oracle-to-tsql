@@ -1,0 +1,6 @@
+{
+  "$comment": "Project decisions on backup, dated and leftover tables. Entries here beat the built-in rules. Format and rules: .github/skills/oracle-tsql-reference/references/object-exclusions.md#project-overrides",
+  "include": [],
+  "exclude": [],
+  "extraPatterns": []
+}

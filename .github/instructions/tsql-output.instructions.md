@@ -77,7 +77,18 @@ Use inline comments for migration annotations:
 -- MIGRATION NOTE: Autonomous transaction simulated with separate connection pattern
 -- MIGRATION WARNING: Oracle DECODE with NULL comparison - behavior may differ, verify logic
 -- MIGRATION TODO: Oracle DBMS_OUTPUT calls converted to PRINT - review if logging framework needed
+-- MIGRATION EXCLUDED [EX-001]: backup table SHIPMENTS_BAK (auto: _BAK) — not created. To restore, remove the leading "-- " from the lines below.
+-- MIGRATION WARNING [FL-001]: SHIPMENTS_OLD looks like a backup (auto: _OLD) but is kept: referenced by v_shipment_history
 ```
+
+### Commented-out code
+
+Statements are commented out, never deleted. Backup, dated and leftover tables (with their indexes, grants, comments and DML) are commented out, and so is code with no T-SQL equivalent. Every commented-out statement:
+- starts with a `-- MIGRATION EXCLUDED [EX-nnn]:` marker line;
+- has every line, including `GO`, prefixed with `-- ` (no `/* … */`);
+- has a matching row in section 1.8 of the migration report.
+
+Rules: [object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md).
 
 ## Quality Requirements
 
@@ -92,5 +103,6 @@ Use inline comments for migration annotations:
 - Must use a filtered unique index (or indexed view) for `UNIQUE` keys on nullable columns
 - Must keep Oracle's conversion failures: `CONVERT` / `CAST`, with `TRY_` functions only where Oracle used `DEFAULT … ON CONVERSION ERROR`
 - Must convert row-level triggers to set-based triggers over `inserted` / `deleted`
+- Must not create backup, dated or leftover tables, and must not contain commented-out code without a `MIGRATION EXCLUDED` marker and a report row
 
 Rules, examples and sources: [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md).

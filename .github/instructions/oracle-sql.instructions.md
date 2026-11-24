@@ -25,6 +25,7 @@ When working with files in the `oracle-sql/` directory, these are **source Oracl
 3. **Note dependencies**: References to other objects, synonyms, database links, sequences
 4. **Flag potential issues**: Autonomous transactions, CONNECT BY hierarchies, custom types, bulk operations, REF CURSORs, row-level triggers, `MERGE … DELETE WHERE`, `SELECT … FOR UPDATE`, global temporary tables
 5. **Flag data-dependent mappings**: bare `NUMBER`, `NUMBER(1)`–`NUMBER(4)`, `DATE`, `TIMESTAMP(8|9)`, and string or nullable `UNIQUE` keys need the Oracle profiling queries from the [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md) skill
+6. **Spot backup, dated and leftover tables**: names like `ORDERS_BAK`, `ORDERS_20211014`, `TMP_ORDERS` or `BIN$…` are commented out instead of created, unless code still uses them ([object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md)). Project decisions are in `migration-exclusions.json`
 
 Conversion rules and their sources are in the [oracle-tsql-reference](../skills/oracle-tsql-reference/SKILL.md) skill.
 

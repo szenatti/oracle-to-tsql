@@ -2,6 +2,7 @@ import { joinSession } from "@github/copilot-sdk/extension";
 import { readdir, stat, readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, relative, basename, extname, dirname } from "node:path";
 import { existsSync } from "node:fs";
+import { analyzeSources, loadOverrides, OVERRIDES_FILE } from "./exclusions.mjs";
 
 const CWD = process.cwd();
 const ORACLE_DIR = join(CWD, "oracle-sql");
@@ -45,6 +46,48 @@ async function collectSqlFiles(dir) {
 // Relative path → slug for report filenames (preserves subdirs as dashes)
 function pathToSlug(relPath) {
     return relPath.replace(/[\\/]/g, "--").replace(/\.[^.]+$/, "");
+}
+
+// --- Excluded objects (backup, dated and leftover tables) ---
+
+async function detectExclusions(files) {
+    const sources = [];
+    for (const f of files) {
+        sources.push({ relPath: f.relPath, content: await readFile(join(ORACLE_DIR, f.relPath), "utf-8") });
+    }
+    return analyzeSources(sources, await loadOverrides(CWD));
+}
+
+function exclusionCounts(fileResult) {
+    return {
+        excludedObjects: fileResult?.excludedObjects || 0,
+        excludedStatements: fileResult?.excluded.length || 0,
+        flaggedObjects: fileResult?.flagged.length || 0,
+        includedByOverride: fileResult?.included.length || 0,
+    };
+}
+
+function exclusionPromptSection(phase, fileResult) {
+    const rules = "`.github/skills/oracle-tsql-reference/references/object-exclusions.md`";
+    const lines = [``, `## Excluded and commented-out code`, ``];
+    if (fileResult) {
+        const rows = (list) => list.map((r) => "  " + JSON.stringify(r)).join(",\n");
+        lines.push(
+            `The extension detected these candidates (\`get_object_exclusions\` returns the same data). Confirm each against ${rules}:`,
+            "```json",
+            `{\n "excluded": [\n${rows(fileResult.excluded)}\n ],\n "flagged": [\n${rows(fileResult.flagged)}\n ],\n "included": [\n${rows(fileResult.included)}\n ]\n}`,
+            "```",
+        );
+    } else {
+        lines.push(`The extension found no backup, dated or leftover tables in this file. Still apply ${rules}.`);
+    }
+    const task = {
+        evaluate: "Write section 1.8 of the migration report with every candidate, keeping the EX-/FL- IDs (write \"None\" if there are none).",
+        convert: "Comment out every EX- statement with its `-- MIGRATION EXCLUDED [EX-nnn]:` marker. Add any other code you comment out as new EX- rows in section 1.8, and fill in the output lines.",
+        validate: "Check that `MIGRATION EXCLUDED` markers in the T-SQL and the rows in section 1.8 match one to one, and that no live statement references an excluded table.",
+    }[phase];
+    if (task) lines.push(``, task);
+    return lines;
 }
 
 // --- Persistent state ---
@@ -117,29 +160,66 @@ const session = await joinSession({
         {
             name: "scan_oracle_files",
             description:
-                "Scans oracle-sql/ and returns structured JSON array of all Oracle SQL files with relative path, size, lines, and modified date. Also syncs migration state for any new files.",
+                "Scans oracle-sql/ and returns structured JSON array of all Oracle SQL files with relative path, size, lines, and modified date. Also detects backup, dated and leftover tables to comment out (counts per file; details via get_object_exclusions) and syncs migration state for any new files.",
             parameters: { type: "object", properties: {} },
             handler: async () => {
                 const files = await collectSqlFiles(ORACLE_DIR);
                 if (files.length === 0) {
                     return JSON.stringify({ files: [], message: "No SQL files in oracle-sql/. Drop files there to begin." });
                 }
+                const exclusions = await detectExclusions(files);
+
                 // Sync state for any newly discovered files
                 const state = await loadState();
-                for (const f of files) ensureItem(state, f.relPath);
+                for (const f of files) {
+                    ensureItem(state, f.relPath).exclusions = exclusionCounts(exclusions.files[f.relPath]);
+                }
                 await saveState(state);
 
                 return JSON.stringify({
                     count: files.length,
                     totalLines: files.reduce((s, f) => s + f.lines, 0),
                     totalSizeKB: +(files.reduce((s, f) => s + f.size, 0) / 1024).toFixed(1),
+                    exclusions: {
+                        ...exclusions.totals,
+                        overridesFile: exclusions.overrides.found ? OVERRIDES_FILE : `${OVERRIDES_FILE} (not found — built-in rules only)`,
+                        overrideErrors: exclusions.overrides.errors,
+                        unmatchedOverrides: exclusions.overrides.unmatched,
+                    },
                     files: files.map((f) => ({
                         relPath: f.relPath,
                         lines: f.lines,
                         sizeKB: +(f.size / 1024).toFixed(1),
                         modified: f.modified.split("T")[0],
+                        exclusions: exclusionCounts(exclusions.files[f.relPath]),
                     })),
                 });
+            },
+        },
+        {
+            name: "get_object_exclusions",
+            description:
+                "Returns the backup, dated and leftover tables detected in oracle-sql/: statements to comment out (EX- IDs, with dependent indexes, grants, comments and DML), tables kept but flagged for a decision (FL- IDs, with the code that uses them), and overrides applied from migration-exclusions.json. Rules: .github/skills/oracle-tsql-reference/references/object-exclusions.md.",
+            parameters: {
+                type: "object",
+                properties: {
+                    relPath: { type: "string", description: "Optional relative path of one Oracle SQL file. Omit for all files." },
+                },
+            },
+            handler: async (args) => {
+                const files = await collectSqlFiles(ORACLE_DIR);
+                const exclusions = await detectExclusions(files);
+                if (args?.relPath) {
+                    if (!files.some((f) => f.relPath === args.relPath)) {
+                        return JSON.stringify({ error: `File not found in oracle-sql/: ${args.relPath}` });
+                    }
+                    return JSON.stringify({
+                        relPath: args.relPath,
+                        overrides: exclusions.overrides,
+                        ...(exclusions.files[args.relPath] || { excluded: [], flagged: [], included: [], excludedObjects: 0 }),
+                    }, null, 2);
+                }
+                return JSON.stringify(exclusions, null, 2);
             },
         },
 
@@ -160,10 +240,12 @@ const session = await joinSession({
                 for (const phase of PHASES) {
                     summary[phase] = { pending: 0, in_progress: 0, done: 0, failed: 0 };
                 }
+                summary.exclusions = { excludedObjects: 0, excludedStatements: 0, flaggedObjects: 0, includedByOverride: 0 };
 
                 const items = keys.map((relPath) => {
                     const item = state[relPath];
                     for (const phase of PHASES) summary[phase][item[phase] || "pending"]++;
+                    for (const k of Object.keys(summary.exclusions)) summary.exclusions[k] += item.exclusions?.[k] || 0;
                     return { relPath, ...item };
                 });
 
@@ -196,6 +278,9 @@ const session = await joinSession({
 
                 const phases = args.phase === "full" ? PHASES : [args.phase];
                 const plan = { phase: args.phase, batches: [] };
+                const sourceFiles = (await collectSqlFiles(ORACLE_DIR)).filter((f) => keys.includes(f.relPath));
+                const exclusions = await detectExclusions(sourceFiles);
+                if (exclusions.overrides.errors.length) plan.overrideErrors = exclusions.overrides.errors;
 
                 for (const phase of phases) {
                     // Find files pending for this phase
@@ -252,6 +337,7 @@ const session = await joinSession({
                             ...(phase === "convert"
                                 ? [``, `Ensure parent directories exist before writing (use mkdir -p if needed).`]
                                 : []),
+                            ...(phase === "analyze" ? [] : exclusionPromptSection(phase, exclusions.files[relPath])),
                         ].join("\n");
 
                         return {

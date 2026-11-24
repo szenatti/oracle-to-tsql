@@ -28,6 +28,7 @@ Verify the converted file has proper T-SQL structure:
 - [ ] `SET XACT_ABORT ON` in procedures that own their transaction (not in procedures whose Oracle callers handle their exceptions and continue)
 - [ ] No deprecated T-SQL features used
 - [ ] Migration notes included where conversions are non-trivial
+- [ ] Every commented-out statement has a `-- MIGRATION EXCLUDED [EX-nnn]:` marker and a row in report section 1.8
 
 ### 3. Syntax Validation
 
@@ -171,7 +172,7 @@ Verify ALL DECODE conversions, especially those comparing to NULL.
 
 ### 5. Completeness Check
 
-- [ ] All objects from source are present in output
+- [ ] All objects from source are present in output (live, or commented out with an `EX-` row in section 1.8)
 - [ ] All columns/parameters are mapped
 - [ ] All business logic paths are preserved
 - [ ] Default values are preserved
@@ -179,6 +180,15 @@ Verify ALL DECODE conversions, especially those comparing to NULL.
 - [ ] Index definitions are converted (if applicable)
 - [ ] Grant/permission statements are converted
 - [ ] Comments are preserved
+
+#### Excluded and commented-out code
+
+Check section 1.8 of the report against the T-SQL and the [object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md) rules:
+- **Markers match rows.** Every `MIGRATION EXCLUDED [EX-nnn]` marker has a row, and every row has a marker. Every line from the marker to the end of that statement (including `GO`) starts with `-- `. Commented-out code with no marker is a 🔴 finding.
+- **Nothing live depends on an excluded table.** No uncommented statement may reference an excluded table: that code would fail on SQL Server. Dependants (indexes, grants, comments, synonyms, triggers, DML) must be commented out with it.
+- **The decisions follow the rules.** Each excluded table matches a rule or an `exclude` override. A table that the guards should have kept (temporary table, used by kept code) is a 🔴 finding. Each flagged table has a `MIGRATION WARNING [FL-nnn]` line and is converted.
+
+Then update section 1.8: replace everything from `<!-- PHASE:EXCLUSIONS -->` to the next `---`, setting **Verified** to ✅ or ❌ on every `EX-` row. Report each ❌ as a finding in Part 2.
 
 ### 6. Execution Readiness Check
 
@@ -225,8 +235,9 @@ Replace the placeholder with this structure:
 | 7 | No deprecated T-SQL features | ✅/❌ | |
 | 8 | Migration notes for non-trivial conversions | ✅/❌ | |
 | 9 | `SET XACT_ABORT ON` in transaction-owning procedures | ✅/❌/N/A | |
+| 10 | Commented-out code matches section 1.8 (markers ↔ rows, no live references) | ✅/❌/N/A | |
 
-**Result**: X/9 checks passed
+**Result**: X/10 checks passed
 
 ### 2.2 Semantic Equivalence
 
@@ -252,7 +263,7 @@ Replace the placeholder with this structure:
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| 1 | All objects from source present | ✅/❌ | |
+| 1 | All objects from source present (live or as a recorded `EX-` row) | ✅/❌ | |
 | 2 | All columns/parameters mapped | ✅/❌ | |
 | 3 | All business logic paths preserved | ✅/❌ | |
 | 4 | Default values preserved | ✅/❌ | |
@@ -337,7 +348,7 @@ When validating all converted files:
 
 | # | File | Status | Critical | Warnings | Info | Structural | Semantic |
 |---|------|--------|----------|----------|------|------------|----------|
-| 1 | 01_datatypes.sql | ✅ | 0 | 1 | 2 | 9/9 | 13/13 |
+| 1 | 01_datatypes.sql | ✅ | 0 | 1 | 2 | 10/10 | 13/13 |
 
 ## Cross-File Dependencies
 | Source | Depends On | Status |

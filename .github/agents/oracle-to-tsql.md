@@ -26,6 +26,12 @@ All mapping tables and patterns live in the [oracle-tsql-reference](../skills/or
 3. Where a mapping depends on the data and the evaluation marked it **pending profiling**, apply the safe default from `data-types.md` and add a `-- MIGRATION TODO:` that names the [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md) check to run.
 4. Use the target collation and source Oracle version recorded in Part 1 of the migration report. If none is recorded, assume the default `SQL_Latin1_General_CP1_CI_AS` and add a `-- MIGRATION WARNING:` on string keys.
 5. Before writing a `-- MIGRATION NOTE:` about behaviour the reference files don't cover, check both sides: Oracle behaviour with the Oracle Database Documentation MCP and T-SQL behaviour with Microsoft Learn MCP. Follow [Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions) and cite the URLs in the note.
+6. Comment out the backup, dated and leftover tables listed in section 1.8 of the migration report (the `EX-` rows), following [object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md#commenting-out):
+   - convert each statement first, then prefix every line with `-- `, including `GO`, under its `-- MIGRATION EXCLUDED [EX-nnn]:` marker;
+   - put a `-- MIGRATION WARNING [FL-nnn]:` line above each flagged table and convert it normally;
+   - if there's no section 1.8 (no evaluation was run), apply the rules yourself and create the section.
+
+   Never comment out code without a marker. If you comment out anything else, such as an Oracle feature with no T-SQL equivalent, give it the next free `EX-` ID and add a row for it.
 
 ### 3. Apply Standards
 
@@ -40,10 +46,18 @@ Every converted file must:
 - Add `-- MIGRATION NOTE:` comments where behavior differs
 - Add `-- MIGRATION WARNING:` for areas needing human review
 - Add `-- MIGRATION TODO:` for items requiring additional work or testing
+- Mark every commented-out statement with `-- MIGRATION EXCLUDED [EX-nnn]:`
 
 ### 4. Save Output
 
 Save the converted file to `tsql-output/<same_relative_path_and_name>`.
+
+Then update section 1.8 of `migration-reports/migration-<filename>.md`: replace everything from the `<!-- PHASE:EXCLUSIONS -->` marker to the next `---`.
+- Fill in **Output lines** for every `EX-` row.
+- Add rows for anything else you commented out.
+- Update the counts at the top of the section.
+
+Leave **Verified** as _pending_; `@tsql-validator` fills it in.
 
 ## Important Reminders
 
@@ -57,6 +71,7 @@ Save the converted file to `tsql-output/<same_relative_path_and_name>`.
 8. **Row triggers become set-based** — SQL Server triggers fire once per statement ([triggers](../skills/oracle-tsql-reference/references/conversion-patterns.md#triggers))
 9. **Test boundary conditions** — date boundaries, NULL handling, empty and spaces-only strings, zero values, month ends
 10. **Preserve comments** — original Oracle comments often contain business logic documentation
+11. **Don't create leftovers, don't hide code** — backup, dated and scratch tables are commented out, not created; every commented-out statement has a marker and a row in section 1.8 ([object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md))
 
 ## References
 

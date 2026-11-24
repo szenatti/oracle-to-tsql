@@ -10,8 +10,27 @@ These are sample Oracle SQL files for testing the migration toolkit. They cover 
 | `04_tricky_patterns.sql` | 🔴 Critical | CONNECT BY, (+) joins, empty-string=NULL, RETURNING INTO, BULK COLLECT |
 | `05_package_conversion.sql` | 🔴 Critical | Full package spec+body, REF CURSOR, session state, initialization block |
 | `06_oracle12c_semantics.sql` | 🔴 Critical | Identity columns, sequence defaults and triggers, bare `NUMBER` / `TIMESTAMP(9)`, case- and trailing-space-sensitive keys, nullable `UNIQUE`, `FETCH FIRST`, conversion-error defaults, date arithmetic, `ADD_MONTHS` / `GREATEST` edge cases, `MERGE … DELETE WHERE`, `FOR UPDATE NOWAIT` / `SKIP LOCKED`, global temporary table, database link synonym, caller-handled exceptions |
+| `07_backup_and_dated_tables.sql` | 🟡 Moderate | Backup, dated, scratch and recycle-bin tables to comment out with their dependent statements; look-alikes to keep and flag |
 
 The expected conversions for sample 06 are documented, with sources, in the [oracle-tsql-reference](../.github/skills/oracle-tsql-reference/SKILL.md) skill.
+
+### Expected results for sample 07
+
+| Table | Decision | Why |
+|-------|----------|-----|
+| `SHIPMENTS_BAK` (+ index, comment, grant) | Commented out — EX-001…004 | `_BAK` |
+| `SHIPMENTS_20211014` | Commented out — EX-005 | Full date |
+| `CARRIERS_BKP_2021_10_14` (+ insert) | Commented out — EX-006, EX-007 | Separated date and `_BKP` |
+| `TMP_SHIPMENT_LOAD` | Commented out — EX-008 | `TMP_` |
+| `SHIPMENTS_NEW` | Commented out — EX-009 | `_NEW` is ambiguous, but it's a `SELECT *` copy of `SHIPMENTS` |
+| `"BIN$k1Jx9Q2pTgW5n8bQ==$0"` | Commented out — EX-010 | Recycle bin |
+| `TMP_SHIPMENT_CART` | Kept, flagged — FL-001 | Global temporary table |
+| `SHIPMENTS_OLD` | Kept, flagged — FL-002 | `_OLD`, but view `v_shipment_history` reads it |
+| `SHIPMENT_HOLD`, `SHIPMENTS_ARCHIVE` | Kept, flagged — FL-003, FL-004 | Ambiguous words; `purge_shipments` uses both |
+| `SHIPMENT_STATS_202110` | Kept, flagged — FL-005 | Monthly table |
+| `SHIPMENTS` | Converted | Live table |
+
+Sample 06 also gets one flag: its `TMP_ORDER_IMPORT` matches `TMP_`, but it's a global temporary table.
 
 ## How to Test
 

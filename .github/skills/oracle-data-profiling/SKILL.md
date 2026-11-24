@@ -27,11 +27,12 @@ Some mapping decisions can't be made from DDL alone. Examples: whether a bare `N
 | `TIMESTAMP(8)` / `TIMESTAMP(9)` | P8 sub-100 ns digits |
 | `BINARY_FLOAT` / `BINARY_DOUBLE` | P9 infinity and NaN |
 | `NVARCHAR(n)` sizing with `CHAR` semantics | P10 UTF-16 length |
+| A flagged backup, dated or leftover table: exclude or keep | P11 leftover table usage |
 
 ## Workflow
 
 1. Run the dictionary queries in [oracle-profiling-queries.md](./references/oracle-profiling-queries.md#dictionary-queries) to list candidate columns and unique keys. Replace `HR` with the source schema.
-2. For each candidate, generate the matching check (P1–P10) with real table and column names. For many string columns, use the [schema-wide string profiler](./references/oracle-profiling-queries.md#schema-wide-string-profiler).
+2. For each candidate, generate the matching check (P1–P11) with real table and column names. For many string columns, use the [schema-wide string profiler](./references/oracle-profiling-queries.md#schema-wide-string-profiler).
 3. The evaluator can't connect to Oracle. Put the queries in the report and mark the affected mappings **pending profiling**, with the default safe choice from [data-types.md](../oracle-tsql-reference/references/data-types.md).
 4. After a DBA runs them, record the results and finalize the mappings.
 5. After the data load, run the paired queries in [reconciliation-queries.md](./references/reconciliation-queries.md) and record any mismatches as validation findings.

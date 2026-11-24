@@ -14,6 +14,7 @@ tsql-output/         → Converted T-SQL files (generated output)
 migration-reports/   → Consolidated migration reports (one per source file)
 samples/             → Sample Oracle files for testing the pipeline
 .github/skills/      → Conversion references loaded on demand (see below)
+migration-exclusions.json → Project decisions on backup, dated and leftover tables (committed)
 ```
 
 ## Custom Agents
@@ -44,7 +45,7 @@ The detailed mapping tables and patterns live in skills, so they load only when 
 
 | Skill | Contents | Read when |
 |-------|----------|-----------|
-| [oracle-tsql-reference](skills/oracle-tsql-reference/SKILL.md) | [Semantic differences](skills/oracle-tsql-reference/references/semantic-differences.md), [data types](skills/oracle-tsql-reference/references/data-types.md), [functions](skills/oracle-tsql-reference/references/functions.md), [syntax and PL/SQL](skills/oracle-tsql-reference/references/syntax-and-plsql.md), [conversion patterns](skills/oracle-tsql-reference/references/conversion-patterns.md), [sources](skills/oracle-tsql-reference/references/sources.md) | Evaluating, converting, validating or optimizing any file |
+| [oracle-tsql-reference](skills/oracle-tsql-reference/SKILL.md) | [Semantic differences](skills/oracle-tsql-reference/references/semantic-differences.md), [data types](skills/oracle-tsql-reference/references/data-types.md), [functions](skills/oracle-tsql-reference/references/functions.md), [syntax and PL/SQL](skills/oracle-tsql-reference/references/syntax-and-plsql.md), [conversion patterns](skills/oracle-tsql-reference/references/conversion-patterns.md), [object exclusions](skills/oracle-tsql-reference/references/object-exclusions.md), [sources](skills/oracle-tsql-reference/references/sources.md) | Evaluating, converting, validating or optimizing any file |
 | [oracle-data-profiling](skills/oracle-data-profiling/SKILL.md) | Oracle profiling queries that settle data-dependent mappings; paired Oracle/T-SQL reconciliation queries | A mapping depends on the data, or data has been loaded |
 
 ### Verifying assumptions
@@ -106,7 +107,14 @@ These cause **silent behavioural changes**: the code runs without errors but ret
 - `-- MIGRATION NOTE:` — Documents non-trivial conversions or behavioral differences
 - `-- MIGRATION WARNING:` — Flags areas needing human review or testing
 - `-- MIGRATION TODO:` — Marks incomplete items requiring additional work
+- `-- MIGRATION EXCLUDED [EX-nnn]:` — Heads a statement that is commented out instead of created (see below)
 - Preserve original Oracle comments — they often contain business logic context
+
+### Backup, Dated and Leftover Tables
+- Comment out, don't create, tables such as `ORDERS_BAK`, `BKP_ORDERS`, `ORDERS_20211014`, `TMP_ORDERS` and Oracle leftovers (`BIN$…`, `SYS_EXPORT_…`), together with their indexes, grants, comments and DML. Ambiguous names (`_NEW`, `_ARCHIVE`, `_HOLD`, `_TEMP`, `X_`, `_202110`) are converted with a `-- MIGRATION WARNING [FL-nnn]:` for a person to decide.
+- Keep a table whenever kept code still uses it, or it's a global temporary table. `migration-exclusions.json` at the repo root overrides the rules by name.
+- Never comment out code silently: every commented-out statement, for any reason, gets an `EX-` marker and a row in section 1.8 of the migration report, written in the same run.
+- Full rules: [object-exclusions.md](skills/oracle-tsql-reference/references/object-exclusions.md).
 
 ### What NOT to Use (deprecated or problematic)
 - ❌ `SET ROWCOUNT` — use `TOP` instead

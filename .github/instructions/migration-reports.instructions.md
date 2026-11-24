@@ -110,7 +110,7 @@ Each Oracle SQL file produces a **single** consolidated migration report built i
 
 Structure:
 1. **Report Header** — source file, date (created by evaluator)
-2. **Part 1: Evaluation** — complexity, source Oracle version, target collation, object inventory, Oracle-specific features, semantic differences, dependencies, risks, recommendations, and data profiling queries for mappings pending profiling (created by `@oracle-evaluator`)
+2. **Part 1: Evaluation** — complexity, source Oracle version, target collation, object inventory, Oracle-specific features, semantic differences, dependencies, risks, recommendations, data profiling queries for mappings pending profiling (created by `@oracle-evaluator`), and **1.8 Excluded and Commented-Out Code** (at `<!-- PHASE:EXCLUSIONS -->`; created by the evaluator, updated by `@oracle-to-tsql` and `@tsql-validator` in the same run)
 3. **Part 2: Validation** — structural checks, semantic equivalence, completeness, findings, test scenarios (replaced by `@tsql-validator` at `<!-- PHASE:VALIDATION -->`)
 4. **Part 3: Performance Analysis** — query patterns, findings, index recommendations, optimized code, configuration, testing (replaced by `@performance-analyzer` at `<!-- PHASE:PERFORMANCE -->`)
 5. **Consolidated Action Items** — merged and deduplicated from all phases, sorted by severity (replaced by orchestrator at `<!-- PHASE:ACTIONS -->`)
@@ -118,6 +118,10 @@ Structure:
 Section numbering uses hierarchical format: Part 1 subsections are `### 1.1`, `### 1.2`, etc.; Part 2 uses `### 2.1`, `### 2.2`, etc.
 
 Placeholder markers enable **idempotent updates** — re-running any phase replaces only its own section without affecting other phases or duplicating content.
+
+### Commented-out code is always recorded
+
+Every statement commented out in `tsql-output/` has one row in section 1.8, with the same `EX-nnn` ID as its `-- MIGRATION EXCLUDED` marker. This covers backup, dated and leftover tables, their dependent statements, and code with no T-SQL equivalent. Flagged tables that were kept have `FL-nnn` rows. The phase that comments code out writes the row in the same run. The validator marks each row ✅ or ❌, and flagged tables and override errors become Consolidated Action Items. Rules: [object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md#recording-in-the-migration-report).
 
 ### Summary Reports (`*-summary.md`)
 

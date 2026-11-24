@@ -101,6 +101,14 @@ For a feature that isn't listed there, or isn't covered by the reference files, 
 #### Data-Dependent Mappings
 When a mapping depends on the data (bare `NUMBER`, `NUMBER(1)`–`NUMBER(4)`, `DATE` time parts, `TIMESTAMP(8|9)`, nullable or string `UNIQUE` keys, `CHAR`-semantics lengths), mark it **pending profiling**. Generate the matching Oracle queries from the [oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md) skill for report section 1.7.
 
+#### Backup, Dated and Leftover Tables
+Check every `CREATE TABLE` name against [object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md), and apply the project decisions in `migration-exclusions.json`. In Copilot CLI, start from the `get_object_exclusions` results (or the list in your batch prompt) and confirm them; don't renumber their IDs.
+- **Excluded:** give the table's `CREATE` and each dependent statement (index, constraint, comment, grant, synonym, trigger, top-level DML) an `EX-` ID.
+- **Flagged:** give the table an `FL-` ID and say why it was kept (temporary table, the code that uses it, or an ambiguous name). Add a [P11](../skills/oracle-data-profiling/references/oracle-profiling-queries.md#p11--leftover-table-usage) catalog query for it to section 1.7.
+- **Override errors and unmatched overrides:** list them in section 1.8.
+
+Record all of them in report section 1.8.
+
 #### Dependencies
 - Tables referenced (FROM, JOIN, INSERT INTO, UPDATE, DELETE FROM)
 - Views referenced
@@ -150,6 +158,7 @@ Write the full report skeleton with **Part 1: Evaluation** filled in and placeho
 > - **Warnings**: <count>
 > - **Dependencies**: <list key external dependencies>
 > - **Pending Profiling**: <count of mappings waiting for section 1.7 results, or "none">
+> - **Excluded / Flagged**: <e.g. "4 tables commented out (9 statements), 2 flagged, 1 kept by override" — see section 1.8, or "none">
 > - **Recommendation**: <one sentence: ready to convert / needs review / requires redesign>
 
 ### 1.1 Object Inventory
@@ -236,6 +245,35 @@ Oracle queries to run before finalizing the mappings marked **pending profiling*
 SELECT ... ;
 ```
 
+<!-- PHASE:EXCLUSIONS -->
+### 1.8 Excluded and Commented-Out Code
+
+> - **Commented out**: <X tables (Y statements), plus Z other statements added by `@oracle-to-tsql`> — in `tsql-output/<filename>`
+> - **Flagged**: <X tables kept until someone decides>
+> - **Overrides**: <X applied from `migration-exclusions.json`; errors or unmatched names, or "none">
+> - **Status**: planned by `@oracle-evaluator` · output lines by `@oracle-to-tsql` · verified by `@tsql-validator`
+
+#### Commented out
+
+| ID | Object | Statement | Source lines | Output lines | Reason | Rule | Evidence | Verified |
+|----|--------|-----------|--------------|--------------|--------|------|----------|----------|
+| EX-001 | `SHIPMENTS_BAK` | CREATE TABLE … AS SELECT | 27 | _pending_ | Backup table | auto: `_BAK` | CTAS from `SHIPMENTS`; not referenced | _pending_ |
+| EX-002 | `SHIPMENTS_BAK` | CREATE INDEX | 28 | _pending_ | Depends on `SHIPMENTS_BAK` | dependant | | _pending_ |
+
+#### Flagged — kept, decision needed
+
+| ID | Object | Source lines | Rule | Why it was kept | Used by | Decide with |
+|----|--------|--------------|------|-----------------|---------|-------------|
+| FL-001 | `SHIPMENTS_OLD` | 65 | auto: `_OLD` | Referenced by kept code | `v_shipment_history` (line 67) | P11, then `include` or `exclude` in `migration-exclusions.json` |
+
+#### Kept by override
+
+| Object | Source lines | Rule it matched | Override reason | By | Date |
+|--------|--------------|-----------------|-----------------|----|------|
+| `SHIPMENT_HOLD` | 73–76 | flag: `_HOLD` | Live hold queue | jsmith | 2026-11-24 |
+
+Write "None" under a heading with no rows; keep the section number even if 1.7 is omitted. Don't use a line containing only `---` inside this section: phases replace it from the marker to the next `---`.
+
 ---
 
 <!-- PHASE:VALIDATION -->
@@ -258,7 +296,7 @@ SELECT ... ;
 > _Pending — will be generated after all phases complete._
 ```
 
-**IMPORTANT**: The placeholder markers (`<!-- PHASE:VALIDATION -->`, `<!-- PHASE:PERFORMANCE -->`, `<!-- PHASE:ACTIONS -->`) are critical. Each subsequent phase will find its marker and replace the section from the marker through to the next `---` separator.
+**IMPORTANT**: The placeholder markers (`<!-- PHASE:EXCLUSIONS -->`, `<!-- PHASE:VALIDATION -->`, `<!-- PHASE:PERFORMANCE -->`, `<!-- PHASE:ACTIONS -->`) are critical. Each subsequent phase will find its marker and replace the section from the marker through to the next `---` separator. `@oracle-to-tsql` and `@tsql-validator` update section 1.8 this way.
 
 ## Batch Evaluation
 
@@ -279,13 +317,17 @@ When asked to evaluate all files or the entire `oracle-sql/` folder:
 > - **Complexity Distribution**: X 🟢 / X 🟡 / X 🟠 / X 🔴
 > - **Total Critical Findings**: X across Y files
 > - **Total Warnings**: X
+> - **Excluded / Flagged**: X tables commented out across Y files, Z flagged
 > - **Recommended Migration Order**: Simple → Moderate → Complex (respecting dependencies)
 
 ## File-by-File Results
 
-| # | File | Complexity | Critical | Warnings | Dependencies | Status |
-|---|------|-----------|----------|----------|--------------|--------|
-| 1 | 01_datatypes.sql | 🟢 Simple | 0 | 2 | departments | Ready |
+| # | File | Complexity | Critical | Warnings | Excluded | Flagged | Dependencies | Status |
+|---|------|-----------|----------|----------|----------|---------|--------------|--------|
+| 1 | 01_datatypes.sql | 🟢 Simple | 0 | 2 | 0 | 0 | departments | Ready |
+
+## Excluded and Flagged Objects
+<Every EX- table and FL- table across files: file, ID, object, reason, rule. The data load skips the excluded tables; list the flagged ones for a decision. Include override errors and unmatched overrides.>
 
 ## Common Patterns
 <Issues that appear across multiple files>

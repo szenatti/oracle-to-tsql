@@ -140,6 +140,11 @@ The extension provides tools that the CLI agent can use. Ask Copilot to use them
 ```
 → Copilot calls `migration_status`, shows per-file progress.
 
+```
+> Which tables will be commented out?
+```
+→ Copilot calls `get_object_exclusions`, lists the backup, dated and leftover tables it will comment out (`EX-` rows) and the look-alikes kept for a decision (`FL-` rows).
+
 ### Single-File Workflow
 
 #### Step 1: Evaluate
@@ -332,6 +337,7 @@ graph TB
         T2["migration_status"]
         T3["generate_batch_plan"]
         T4["claim / complete / fail\n/ reset work_item"]
+        T5["get_object_exclusions"]
     end
 
     subgraph "State"
@@ -340,7 +346,7 @@ graph TB
 
     CI --> A1 & A2 & A3 & A4
     SK -.->|"read when needed"| A1 & A2 & A3 & A4
-    A5 --> T1 & T2 & T3 & T4
+    A5 --> T1 & T2 & T3 & T4 & T5
     T4 --> S
     T3 --> A1 & A2 & A3 & A4
 
@@ -361,6 +367,8 @@ graph TB
 | `.github/instructions/migration-reports.instructions.md` | Defines report format with severity tags | When working with `migration-reports/**` files |
 | `.github/agents/*.md` | Defines specialized agent behavior with detailed prompts | When you invoke `@agent-name` |
 | `.github/extensions/oracle-migration/extension.mjs` | Provides custom tools for file discovery, status tracking, batch orchestration | **Copilot CLI only** — loaded at session start |
+| `.github/extensions/oracle-migration/exclusions.mjs` | Detects backup, dated and leftover tables to comment out ([rules](.github/skills/oracle-tsql-reference/references/object-exclusions.md)) | Called by `scan_oracle_files`, `get_object_exclusions` and `generate_batch_plan` |
+| `migration-exclusions.json` | Project decisions that override those rules by table name or extra pattern | Read on every scan; commit it |
 
 ---
 

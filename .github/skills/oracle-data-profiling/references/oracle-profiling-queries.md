@@ -176,6 +176,52 @@ FROM   hr.customers;
 
 **Refs**: [Oracle — LENGTH, LENGTHB, LENGTH2](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/LENGTH.html) · [SQL Server — nchar and nvarchar (byte-pairs)](https://learn.microsoft.com/en-us/sql/t-sql/data-types/nchar-and-nvarchar-transact-sql)
 
+## P11 — Leftover table usage
+
+Decides: whether a table flagged in section 1.8 (an `FL-` row) can be excluded ([object-exclusions.md](../../oracle-tsql-reference/references/object-exclusions.md)). The source files only show the code you were given. The catalog shows every object in the database that depends on the table, the foreign keys pointing at it, and whether its data still changes. Replace the list with the flagged tables.
+
+```sql
+-- Optional: write pending DML counts to the dictionary first (needs ANALYZE ANY)
+-- EXEC DBMS_STATS.FLUSH_DATABASE_MONITORING_INFO;
+
+SELECT t.owner, t.table_name, t.temporary, t.num_rows, t.last_analyzed,
+       o.created, o.last_ddl_time,
+       (SELECT COUNT(*)
+        FROM   all_dependencies d
+        WHERE  d.referenced_owner = t.owner
+        AND    d.referenced_name  = t.table_name
+        AND    d.referenced_type  = 'TABLE')  AS dependent_objects,
+       (SELECT COUNT(*)
+        FROM   all_constraints c
+        JOIN   all_constraints p ON p.owner = c.r_owner AND p.constraint_name = c.r_constraint_name
+        WHERE  c.constraint_type = 'R'
+        AND    p.owner = t.owner AND p.table_name = t.table_name) AS child_foreign_keys,
+       m.inserts, m.updates, m.deletes, m.timestamp AS dml_tracked_until
+FROM   all_tables t
+JOIN   all_objects o
+       ON o.owner = t.owner AND o.object_name = t.table_name AND o.object_type = 'TABLE'
+LEFT JOIN all_tab_modifications m
+       ON m.table_owner = t.owner AND m.table_name = t.table_name AND m.partition_name IS NULL
+WHERE  t.owner = 'HR'
+AND    t.table_name IN ('SHIPMENTS_OLD', 'SHIPMENT_HOLD', 'SHIPMENTS_ARCHIVE')
+ORDER  BY t.table_name;
+
+-- Which objects depend on them
+SELECT d.referenced_name AS table_name, d.owner, d.name, d.type
+FROM   all_dependencies d
+WHERE  d.referenced_owner = 'HR'
+AND    d.referenced_type  = 'TABLE'
+AND    d.referenced_name IN ('SHIPMENTS_OLD', 'SHIPMENT_HOLD', 'SHIPMENTS_ARCHIVE')
+ORDER  BY d.referenced_name, d.owner, d.name;
+```
+
+Reading the result:
+- **Exclude** (add to `exclude` in `migration-exclusions.json`): no dependent objects, no child foreign keys, and no inserts, updates or deletes since statistics were last gathered.
+- **Keep** (add to `include`): anything depends on it, or its data still changes.
+- **Watch for blind spots:** the dictionary doesn't record dynamic SQL, or access from applications and other databases. `ALL_TAB_MODIFICATIONS` only has rows for monitored tables, and it's reset when statistics are gathered. Ask the application owners before excluding a table that's still large or recently changed.
+
+**Refs**: [Oracle — ALL_DEPENDENCIES](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_DEPENDENCIES.html) · [ALL_TAB_MODIFICATIONS](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_TAB_MODIFICATIONS.html) · [ALL_OBJECTS](https://docs.oracle.com/en/database/oracle/oracle-database/19/refrn/ALL_OBJECTS.html) · [DBMS_STATS](https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_STATS.html)
+
 ---
 
 ## Schema-wide string profiler

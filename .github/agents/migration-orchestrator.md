@@ -55,22 +55,24 @@ Read the file `.github/agents/oracle-evaluator.md` for rules, then:
 - Read the Oracle SQL source file
 - Read `.github/skills/oracle-tsql-reference/SKILL.md` and its `semantic-differences.md`
 - Analyze for complexity, Oracle-specific features, dependencies, risks
-- **Create** the consolidated report `migration-reports/migration-<filename>.md` with skeleton + Part 1 (Evaluation)
+- Find backup, dated and leftover tables (`object-exclusions.md`, `migration-exclusions.json`)
+- **Create** the consolidated report `migration-reports/migration-<filename>.md` with skeleton + Part 1 (Evaluation), including section 1.8
 
 #### Phase 2: Convert
 Read the file `.github/agents/oracle-to-tsql.md` for rules, then:
 - Read the Oracle SQL source file
 - Read the migration report for context (Part 1: Evaluation)
 - Read `.github/skills/oracle-tsql-reference/SKILL.md` and the reference files it lists for the constructs in the source
-- Convert Oracle SQL → T-SQL following all rules
+- Convert Oracle SQL → T-SQL following all rules, commenting out the `EX-` statements with their markers
 - Save converted file to `tsql-output/<filename>`
+- **Update** section 1.8 (`<!-- PHASE:EXCLUSIONS -->`) with output lines and any other commented-out code
 
 #### Phase 3: Validate
 Read the file `.github/agents/tsql-validator.md` for rules, then:
 - Read both the original Oracle file and the converted T-SQL
 - Read the migration report for context (Part 1: Evaluation)
-- Check structural compliance, semantic equivalence, common conversion bugs
-- **Replace** the `<!-- PHASE:VALIDATION -->` section in `migration-reports/migration-<filename>.md` with Part 2 (Validation)
+- Check structural compliance, semantic equivalence, common conversion bugs, and that commented-out code matches section 1.8
+- **Update** section 1.8 (Verified column), then **replace** the `<!-- PHASE:VALIDATION -->` section in `migration-reports/migration-<filename>.md` with Part 2 (Validation)
 
 #### Phase 4: Performance Analysis
 Read the file `.github/agents/performance-analyzer.md` for rules, then:
@@ -81,6 +83,13 @@ Read the file `.github/agents/performance-analyzer.md` for rules, then:
 
 #### After All Phases: Finalize Report
 After all 4 phases complete for a file, **replace** the `<!-- PHASE:ACTIONS -->` section in the consolidated report with a **Consolidated Action Items** table that merges and deduplicates action items from all phase findings (evaluation, validation, performance), sorted by severity (critical first).
+
+Include from section 1.8:
+- one "keep or exclude" item per `FL-` row, pointing to P11 and `migration-exclusions.json`;
+- one item per override error or unmatched override;
+- one item per `EX-` row whose **Verified** is ❌.
+
+Make sure the report's evaluation summary shows the final excluded and flagged counts.
 
 Use this template for the replacement:
 
@@ -95,6 +104,7 @@ Use this template for the replacement:
 | 1 | Evaluation | 🔴 Must Fix | F-001 | <specific action> | ⬜ Open |
 | 2 | Validation | 🔴 Must Fix | F-001 | <specific action> | ⬜ Open |
 | 3 | Performance | 🟡 Should Fix | P-001 | <specific action> | ⬜ Open |
+| 4 | Evaluation | 🟡 Should Fix | FL-001 | Decide keep or exclude for `SHIPMENTS_OLD` (run P11), then record it in `migration-exclusions.json` | ⬜ Open |
 ```
 
 ### Step 4: Report Progress
@@ -102,11 +112,11 @@ Use this template for the replacement:
 After each file completes, show a status summary:
 
 ```
-| File | Evaluated | Converted | Validated | Analyzed |
-|------|-----------|-----------|-----------|----------|
-| file1.sql | ✅ | ✅ | ✅ | ✅ |
-| file2.sql | ✅ | ✅ | ⬜ | ⬜ |
-| file3.sql | ⬜ | ⬜ | ⬜ | ⬜ |
+| File | Evaluated | Converted | Validated | Analyzed | Excluded | Flagged |
+|------|-----------|-----------|-----------|----------|----------|---------|
+| file1.sql | ✅ | ✅ | ✅ | ✅ | 2 (5 stmts) | 1 |
+| file2.sql | ✅ | ✅ | ⬜ | ⬜ | 0 | 0 |
+| file3.sql | ⬜ | ⬜ | ⬜ | ⬜ | – | – |
 ```
 
 Each file has a single consolidated report at `migration-reports/migration-<filename>.md` that is built incrementally as phases complete.
@@ -150,6 +160,8 @@ Each sub-agent prompt should instruct the agent to:
 - **One file at a time in VS Code**: Process sequentially. This is expected behavior — not an error.
 - **Check existing output**: Skip files that already have output from a given phase (don't re-process unless asked).
 - **Large file sets**: For many files, confirm with the user before starting. Show the plan first.
+- **Excluded objects in the plan**: Include the excluded and flagged counts from `scan_oracle_files` (or your own pass over [object-exclusions.md](../skills/oracle-tsql-reference/references/object-exclusions.md) in VS Code) in the plan. Show any `migration-exclusions.json` errors before starting. Sub-agent prompts from `generate_batch_plan` already carry each file's `EX-`/`FL-` rows; if you write prompts yourself, add the rows from `get_object_exclusions`.
+- **Commented-out code is always recorded**: every phase that comments code out updates section 1.8 of the report in the same run. Don't mark a convert work item done until section 1.8 has output lines for every `EX-` row.
 - **Documentation MCP servers**: Before starting, check that the Microsoft Learn and Oracle Database Documentation MCP tools are available, and say in the plan if either is missing. Phases still run without them, but points they can't check are marked `-- MIGRATION WARNING: unverified` ([Verifying assumptions](../skills/oracle-tsql-reference/SKILL.md#verifying-assumptions)). When merging action items, keep every proposed reference-file change the phases raised.
 
 ## Error Handling
@@ -161,7 +173,8 @@ Each sub-agent prompt should instruct the agent to:
 ## Data Profiling and Reconciliation
 
 - After the evaluate phase, collect every report's **1.7 Data Profiling** section into one list of Oracle queries for the DBA, and tell the user that the affected mappings use safe defaults until results come back ([oracle-data-profiling](../skills/oracle-data-profiling/SKILL.md)).
-- After the data is loaded into SQL Server, offer the paired checks in [reconciliation-queries.md](../skills/oracle-data-profiling/references/reconciliation-queries.md) (row counts, column profiles, row hashes).
+- Collect every report's **1.8** rows into one list for whoever runs the data load. They should skip the excluded tables, and load the flagged ones until someone decides.
+- After the data is loaded into SQL Server, offer the paired checks in [reconciliation-queries.md](../skills/oracle-data-profiling/references/reconciliation-queries.md) (row counts, column profiles, row hashes). Leave out the excluded tables.
 
 ## References
 

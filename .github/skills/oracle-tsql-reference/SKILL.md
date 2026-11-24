@@ -18,6 +18,7 @@ Detailed conversion rules used by `@oracle-evaluator`, `@oracle-to-tsql`, `@tsql
 | Built-in functions (`NVL`, `DECODE`, `TO_DATE`, `TO_CHAR`, `SUBSTR`, `LISTAGG`, `GREATEST`, …) | [functions.md](./references/functions.md) |
 | Query syntax (`DUAL`, `ROWNUM`, `FETCH FIRST`, `CONNECT BY`, `(+)`), PL/SQL blocks, exceptions, cursors, packages, `DBMS_*` packages | [syntax-and-plsql.md](./references/syntax-and-plsql.md) |
 | Identity columns and sequences, `MERGE`, triggers, transactions and error handling, `FOR UPDATE` locking, schemas, database links, synonyms, temporary tables, hierarchical queries, pagination, `RETURNING INTO`, dynamic SQL | [conversion-patterns.md](./references/conversion-patterns.md) |
+| Any `CREATE TABLE`: backup, dated, scratch or Oracle system tables to comment out; recording any commented-out code | [object-exclusions.md](./references/object-exclusions.md) |
 
 3. When a conversion changes behaviour, say so in a `-- MIGRATION NOTE:` or `-- MIGRATION WARNING:` comment, naming the rule you applied.
 4. If no rule covers a construct, check the official documentation rather than guessing. Follow [Verifying assumptions](#verifying-assumptions).
