@@ -19,6 +19,8 @@ A GitHub Copilot-powered toolkit for migrating Oracle SQL/PL/SQL code to Microso
 
 > See [samples/README.md](samples/README.md) for detailed testing instructions.
 
+> For a complete project, from exporting the Oracle objects to deploying on Azure SQL Managed Instance (Windows and macOS), follow [MIGRATION-RUNBOOK.md](MIGRATION-RUNBOOK.md) for any Oracle database or schema.
+
 ## Documentation MCP Servers
 
 The agents check behaviour they're unsure about against official documentation through two MCP servers. They work without them, but anything they couldn't check is marked `-- MIGRATION WARNING: unverified`. Rules for using them: [Verifying assumptions](.github/skills/oracle-tsql-reference/SKILL.md#verifying-assumptions).
